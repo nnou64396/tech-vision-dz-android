@@ -1,0 +1,6 @@
+# R8/Keep rules for the TECH VISION DZ Android app.
+# AGP 9.3+ merges all *.keep files in src/main/keepRules into the R8 configuration.
+# The default Android + Compose/proguard optimized rules are applied automatically.
+
+# Add project specific keep rules here as the app grows (e.g. for serialization
+# models kept across releases or third-party SDKs that rely on reflection).
