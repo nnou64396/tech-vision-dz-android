@@ -3,4 +3,8 @@
     <string name="home_tagline">Technology vision for Algeria</string>
     <string name="home_empty">No articles yet</string>
     <string name="retry">Retry</string>
+    <string name="article_not_found">Article not found</string>
+    <string name="article_error">Could not load the article</string>
+    <string name="article_software">Software: %1$s</string>
+    <string name="back">Back</string>
 </resources>

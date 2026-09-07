@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,11 +37,8 @@ import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
 import com.techvisiondz.app.core.ui.components.LoadingState
+import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
 
 /**
  * Home screen. Loads the real published article feed from the existing TECH
@@ -50,6 +48,7 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
+    onArticleClick: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -71,7 +70,7 @@ fun HomeScreen(
                     if (state.data.articles.isEmpty()) {
                         EmptyState(message = stringResource(R.string.home_empty))
                     } else {
-                        ArticleFeed(articles = state.data.articles)
+                        ArticleFeed(articles = state.data.articles, onArticleClick = onArticleClick)
                     }
                 }
             }
@@ -80,20 +79,22 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ArticleFeed(articles: List<ArticleCard>) {
+private fun ArticleFeed(articles: List<ArticleCard>, onArticleClick: (String) -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(items = articles, key = { it.id }) { article ->
-            ArticleCardItem(article = article)
+            ArticleCardItem(article = article, onClick = { onArticleClick(article.slug) })
         }
     }
 }
 
 @Composable
-private fun ArticleCardItem(article: ArticleCard) {
+private fun ArticleCardItem(article: ArticleCard, onClick: () -> Unit) {
     Card(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .testTag("home_article_${article.slug}"),
     ) {
         Row(modifier = Modifier.padding(12.dp)) {
             article.coverUrl?.let { coverUrl ->
@@ -146,16 +147,6 @@ private fun ArticleCardItem(article: ArticleCard) {
     }
 }
 
-private fun formatPublishedAt(iso: String): String {
-    if (iso.isBlank()) return ""
-    return try {
-        OffsetDateTime.parse(iso)
-            .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
-    } catch (e: Exception) {
-        ""
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 private fun ArticleCardItemPreview() {
@@ -175,6 +166,7 @@ private fun ArticleCardItemPreview() {
                     authorName = "TECH VISION DZ",
                     coverUrl = null,
                 ),
+                onClick = {},
             )
         }
     }

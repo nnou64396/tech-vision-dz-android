@@ -4,4 +4,8 @@
     <string name="home_tagline">رؤية التقنية في الجزائر</string>
     <string name="home_empty">لا توجد مقالات بعد</string>
     <string name="retry">إعادة المحاولة</string>
+    <string name="article_not_found">المقال غير موجود</string>
+    <string name="article_error">تعذر تحميل المقال</string>
+    <string name="article_software">البرمجيات: %1$s</string>
+    <string name="back">رجوع</string>
 </resources>

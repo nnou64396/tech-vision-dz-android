@@ -61,5 +61,9 @@ class HomeViewModel(
                 )
             }
         }
+
+        fun factory(repository: ArticleRepository): ViewModelProvider.Factory = viewModelFactory {
+            initializer { HomeViewModel(repository) }
+        }
     }
 }
