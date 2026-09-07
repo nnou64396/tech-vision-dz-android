@@ -1,76 +1,75 @@
 package com.techvisiondz.app.feature.home
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil3.compose.AsyncImage
 import com.techvisiondz.app.R
-import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.ui.UiState
+import com.techvisiondz.app.core.ui.components.ArticleList
 import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
 import com.techvisiondz.app.core.ui.components.LoadingState
-import com.techvisiondz.app.core.ui.formatPublishedAt
-import com.techvisiondz.app.ui.theme.TechVisionDzTheme
 
 /**
  * Home screen. Loads the real published article feed from the existing TECH
  * VISION DZ Supabase backend through the [HomeViewModel] and renders it as an
  * RTL-friendly card list (localized strings + per-article Arabic fallback).
+ * A compact discovery bar on top links to the categories / authors / tags
+ * sections.
  */
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
     onArticleClick: (String) -> Unit = {},
+    onCategoriesClick: () -> Unit = {},
+    onAuthorsClick: () -> Unit = {},
+    onTagsClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when (val state = uiState) {
-                is UiState.Loading -> LoadingState()
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            DiscoveryBar(
+                onCategoriesClick = onCategoriesClick,
+                onAuthorsClick = onAuthorsClick,
+                onTagsClick = onTagsClick,
+            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (val state = uiState) {
+                    is UiState.Loading -> LoadingState()
 
-                is UiState.Error -> ErrorState(
-                    message = state.message,
-                    onRetry = viewModel::loadHome,
-                )
+                    is UiState.Error -> ErrorState(
+                        message = state.message,
+                        onRetry = viewModel::loadHome,
+                    )
 
-                is UiState.Empty -> EmptyState(
-                    message = state.message.ifEmpty { stringResource(R.string.home_empty) },
-                )
+                    is UiState.Empty -> EmptyState(
+                        message = state.message.ifEmpty { stringResource(R.string.home_empty) },
+                    )
 
-                is UiState.Success -> {
-                    if (state.data.articles.isEmpty()) {
-                        EmptyState(message = stringResource(R.string.home_empty))
-                    } else {
-                        ArticleFeed(articles = state.data.articles, onArticleClick = onArticleClick)
+                    is UiState.Success -> {
+                        if (state.data.articles.isEmpty()) {
+                            EmptyState(message = stringResource(R.string.home_empty))
+                        } else {
+                            ArticleList(
+                                articles = state.data.articles,
+                                onArticleClick = onArticleClick,
+                            )
+                        }
                     }
                 }
             }
@@ -79,95 +78,29 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ArticleFeed(articles: List<ArticleCard>, onArticleClick: (String) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(items = articles, key = { it.id }) { article ->
-            ArticleCardItem(article = article, onClick = { onArticleClick(article.slug) })
-        }
-    }
-}
-
-@Composable
-private fun ArticleCardItem(article: ArticleCard, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .testTag("home_article_${article.slug}"),
+private fun DiscoveryBar(
+    onCategoriesClick: () -> Unit,
+    onAuthorsClick: () -> Unit,
+    onTagsClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(modifier = Modifier.padding(12.dp)) {
-            article.coverUrl?.let { coverUrl ->
-                AsyncImage(
-                    model = coverUrl,
-                    contentDescription = article.title,
-                    modifier = Modifier
-                        .size(96.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = article.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!article.excerpt.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = article.excerpt,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                val meta = listOfNotNull(
-                    article.authorName,
-                    article.categoryName,
-                    formatPublishedAt(article.publishedAt),
-                ).joinToString(" · ")
-                if (meta.isNotEmpty()) {
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ArticleCardItemPreview() {
-    TechVisionDzTheme {
-        Box(modifier = Modifier.padding(vertical = 8.dp)) {
-            ArticleCardItem(
-                article = ArticleCard(
-                    id = "preview-1",
-                    slug = "preview",
-                    title = "مقال تجريبي عن أحدث التقنيات في الجزائر",
-                    excerpt = "هذا وصف قصير للمقال التجريبي المعروض في معاينة التصميم.",
-                    featured = true,
-                    publishedAt = "2026-08-01T09:00:00Z",
-                    readingTimeMinutes = 5,
-                    viewsCount = 120,
-                    categoryName = "تقنية",
-                    authorName = "TECH VISION DZ",
-                    coverUrl = null,
-                ),
-                onClick = {},
-            )
-        }
+        AssistChip(
+            onClick = onCategoriesClick,
+            label = { Text(text = stringResource(R.string.categories)) },
+            modifier = Modifier.weight(1f),
+        )
+        AssistChip(
+            onClick = onAuthorsClick,
+            label = { Text(text = stringResource(R.string.authors)) },
+            modifier = Modifier.weight(1f),
+        )
+        AssistChip(
+            onClick = onTagsClick,
+            label = { Text(text = stringResource(R.string.tags)) },
+            modifier = Modifier.weight(1f),
+        )
     }
 }

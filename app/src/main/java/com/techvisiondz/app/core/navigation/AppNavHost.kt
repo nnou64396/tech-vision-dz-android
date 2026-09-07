@@ -11,8 +11,20 @@ import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.data.repository.SupabaseArticleRepository
 import com.techvisiondz.app.feature.article.ArticleDetailScreen
 import com.techvisiondz.app.feature.article.ArticleDetailViewModel
+import com.techvisiondz.app.feature.author.AuthorArticlesScreen
+import com.techvisiondz.app.feature.author.AuthorArticlesViewModel
+import com.techvisiondz.app.feature.author.AuthorListScreen
+import com.techvisiondz.app.feature.author.AuthorViewModel
+import com.techvisiondz.app.feature.category.CategoryArticlesScreen
+import com.techvisiondz.app.feature.category.CategoryArticlesViewModel
+import com.techvisiondz.app.feature.category.CategoryListScreen
+import com.techvisiondz.app.feature.category.CategoryViewModel
 import com.techvisiondz.app.feature.home.HomeScreen
 import com.techvisiondz.app.feature.home.HomeViewModel
+import com.techvisiondz.app.feature.tag.TagArticlesScreen
+import com.techvisiondz.app.feature.tag.TagArticlesViewModel
+import com.techvisiondz.app.feature.tag.TagListScreen
+import com.techvisiondz.app.feature.tag.TagViewModel
 
 /**
  * Root navigation graph for the app.
@@ -34,6 +46,9 @@ fun AppNavHost(
         composable<Routes.Home> {
             HomeScreen(
                 onArticleClick = { slug -> navController.navigate(Routes.ArticleDetail(slug)) },
+                onCategoriesClick = { navController.navigate(Routes.Categories) },
+                onAuthorsClick = { navController.navigate(Routes.Authors) },
+                onTagsClick = { navController.navigate(Routes.Tags) },
                 viewModel = viewModel(factory = HomeViewModel.factory(repository)),
             )
         }
@@ -44,6 +59,60 @@ fun AppNavHost(
                 viewModel = viewModel(
                     key = "article-detail-$slug",
                     factory = ArticleDetailViewModel.factory(slug, repository),
+                ),
+            )
+        }
+        composable<Routes.Categories> {
+            CategoryListScreen(
+                onBack = { navController.popBackStack() },
+                onCategoryClick = { slug -> navController.navigate(Routes.CategoryArticles(slug)) },
+                viewModel = viewModel(factory = CategoryViewModel.factory(repository)),
+            )
+        }
+        composable<Routes.CategoryArticles> { backStackEntry ->
+            val slug = backStackEntry.toRoute<Routes.CategoryArticles>().slug
+            CategoryArticlesScreen(
+                onBack = { navController.popBackStack() },
+                onArticleClick = { articleSlug -> navController.navigate(Routes.ArticleDetail(articleSlug)) },
+                viewModel = viewModel(
+                    key = "category-articles-$slug",
+                    factory = CategoryArticlesViewModel.factory(slug, repository),
+                ),
+            )
+        }
+        composable<Routes.Authors> {
+            AuthorListScreen(
+                onBack = { navController.popBackStack() },
+                onAuthorClick = { slug -> navController.navigate(Routes.AuthorArticles(slug)) },
+                viewModel = viewModel(factory = AuthorViewModel.factory(repository)),
+            )
+        }
+        composable<Routes.AuthorArticles> { backStackEntry ->
+            val slug = backStackEntry.toRoute<Routes.AuthorArticles>().slug
+            AuthorArticlesScreen(
+                onBack = { navController.popBackStack() },
+                onArticleClick = { articleSlug -> navController.navigate(Routes.ArticleDetail(articleSlug)) },
+                viewModel = viewModel(
+                    key = "author-articles-$slug",
+                    factory = AuthorArticlesViewModel.factory(slug, repository),
+                ),
+            )
+        }
+        composable<Routes.Tags> {
+            TagListScreen(
+                onBack = { navController.popBackStack() },
+                onTagClick = { slug -> navController.navigate(Routes.TagArticles(slug)) },
+                viewModel = viewModel(factory = TagViewModel.factory(repository)),
+            )
+        }
+        composable<Routes.TagArticles> { backStackEntry ->
+            val slug = backStackEntry.toRoute<Routes.TagArticles>().slug
+            TagArticlesScreen(
+                onBack = { navController.popBackStack() },
+                onArticleClick = { articleSlug -> navController.navigate(Routes.ArticleDetail(articleSlug)) },
+                viewModel = viewModel(
+                    key = "tag-articles-$slug",
+                    factory = TagArticlesViewModel.factory(slug, repository),
                 ),
             )
         }

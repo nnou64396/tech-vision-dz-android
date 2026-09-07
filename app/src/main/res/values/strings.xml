@@ -7,4 +7,16 @@
     <string name="article_error">Could not load the article</string>
     <string name="article_software">Software: %1$s</string>
     <string name="back">Back</string>
+    <string name="categories">Categories</string>
+    <string name="authors">Authors</string>
+    <string name="tags">Tags</string>
+    <string name="categories_articles">Category articles</string>
+    <string name="authors_articles">Author articles</string>
+    <string name="tags_articles">Tag articles</string>
+    <string name="categories_empty">No categories yet</string>
+    <string name="authors_empty">No authors yet</string>
+    <string name="tags_empty">No tags yet</string>
+    <string name="categories_error">Could not load the categories</string>
+    <string name="authors_error">Could not load the authors</string>
+    <string name="tags_error">Could not load the tags</string>
 </resources>

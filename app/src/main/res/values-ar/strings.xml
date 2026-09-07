@@ -8,4 +8,16 @@
     <string name="article_error">تعذر تحميل المقال</string>
     <string name="article_software">البرمجيات: %1$s</string>
     <string name="back">رجوع</string>
+    <string name="categories">الفئات</string>
+    <string name="authors">المؤلفون</string>
+    <string name="tags">الوسوم</string>
+    <string name="categories_articles">مقالات الفئة</string>
+    <string name="authors_articles">مقالات المؤلف</string>
+    <string name="tags_articles">مقالات الوسم</string>
+    <string name="categories_empty">لا توجد فئات بعد</string>
+    <string name="authors_empty">لا يوجد مؤلفون بعد</string>
+    <string name="tags_empty">لا توجد وسوم بعد</string>
+    <string name="categories_error">تعذر تحميل الفئات</string>
+    <string name="authors_error">تعذر تحميل المؤلفين</string>
+    <string name="tags_error">تعذر تحميل الوسوم</string>
 </resources>

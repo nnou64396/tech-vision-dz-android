@@ -2,8 +2,11 @@ package com.techvisiondz.app.feature.home
 
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard
+import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.data.model.AuthorSummary
+import com.techvisiondz.app.core.data.model.Category
 import com.techvisiondz.app.core.data.model.CategorySummary
+import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagSummary
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 
@@ -11,6 +14,12 @@ import com.techvisiondz.app.core.data.repository.ArticleRepository
 class FakeArticleRepository(
     articles: List<ArticleCard> = emptyList(),
     error: Exception? = null,
+    categories: List<Category> = emptyList(),
+    authors: List<Author> = emptyList(),
+    tags: List<Tag> = emptyList(),
+    categoryArticles: Map<String, List<ArticleCard>> = emptyMap(),
+    authorArticles: Map<String, List<ArticleCard>> = emptyMap(),
+    tagArticles: Map<String, List<ArticleCard>> = emptyMap(),
 ) : ArticleRepository {
 
     /** Reassignable so tests can simulate updated content on a subsequent load. */
@@ -31,6 +40,18 @@ class FakeArticleRepository(
     /** Article returned by [getArticle]; null means "not found". */
     var detailArticle: Article? = null
 
+    var categories: List<Category> = categories
+
+    var authors: List<Author> = authors
+
+    var tags: List<Tag> = tags
+
+    var categoryArticles: Map<String, List<ArticleCard>> = categoryArticles
+
+    var authorArticles: Map<String, List<ArticleCard>> = authorArticles
+
+    var tagArticles: Map<String, List<ArticleCard>> = tagArticles
+
     override suspend fun getHomeFeed(languageCode: String): List<ArticleCard> {
         lastLanguageCode = languageCode
         error?.let { throw it }
@@ -43,7 +64,67 @@ class FakeArticleRepository(
         error?.let { throw it }
         return detailArticle
     }
+
+    override suspend fun getCategories(languageCode: String): List<Category> {
+        lastLanguageCode = languageCode
+        error?.let { throw it }
+        return categories
+    }
+
+    override suspend fun getAuthors(languageCode: String): List<Author> {
+        lastLanguageCode = languageCode
+        error?.let { throw it }
+        return authors
+    }
+
+    override suspend fun getTags(languageCode: String): List<Tag> {
+        lastLanguageCode = languageCode
+        error?.let { throw it }
+        return tags
+    }
+
+    override suspend fun getArticlesByCategory(slug: String, languageCode: String): List<ArticleCard> {
+        lastArticleSlug = slug
+        lastLanguageCode = languageCode
+        error?.let { throw it }
+        return categoryArticles[slug] ?: emptyList()
+    }
+
+    override suspend fun getArticlesByAuthor(slug: String, languageCode: String): List<ArticleCard> {
+        lastArticleSlug = slug
+        lastLanguageCode = languageCode
+        error?.let { throw it }
+        return authorArticles[slug] ?: emptyList()
+    }
+
+    override suspend fun getArticlesByTag(slug: String, languageCode: String): List<ArticleCard> {
+        lastArticleSlug = slug
+        lastLanguageCode = languageCode
+        error?.let { throw it }
+        return tagArticles[slug] ?: emptyList()
+    }
 }
+
+fun sampleCategory(
+    id: String = "category-1",
+    slug: String = "tech",
+    name: String = "Tech",
+    description: String? = "Technology news and reviews.",
+) = Category(id = id, slug = slug, name = name, description = description)
+
+fun sampleAuthor(
+    id: String = "author-1",
+    slug: String = "tech-vision-dz",
+    name: String = "TECH VISION DZ",
+    bio: String? = "Algerian technology portal.",
+    avatarUrl: String? = null,
+) = Author(id = id, slug = slug, name = name, bio = bio, avatarUrl = avatarUrl)
+
+fun sampleTag(
+    id: String = "tag-1",
+    slug: String = "ai",
+    name: String = "AI",
+) = Tag(id = id, slug = slug, name = name)
 
 fun sampleArticleCard(
     id: String = "article-1",

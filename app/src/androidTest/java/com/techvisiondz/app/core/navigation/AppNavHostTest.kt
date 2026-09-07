@@ -40,7 +40,7 @@ class AppNavHostTest {
 
         composeRule.onNodeWithText("عنوان في القائمة").assertIsDisplayed()
 
-        composeRule.onNodeWithTag("home_article_sample-a1").performClick()
+        composeRule.onNodeWithTag("article_card_sample-a1").performClick()
         composeRule.waitForIdle()
 
         composeRule.onAllNodesWithText("عنوان المقال الكامل")[0].assertIsDisplayed()
