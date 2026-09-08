@@ -12,6 +12,7 @@ import com.techvisiondz.app.BuildConfig
  * Values are injected at build time from `local.properties` (gitignored):
  *   TECHVISION_SUPABASE_URL="https://<ref>.supabase.co"
  *   TECHVISION_SUPABASE_ANON_KEY="<anon-key>"
+ *   TECHVISION_ARTICLE_BASE_URL="https://techvisiondz.com"
  *
  * The service role key must never be placed in the Android app.
  */
@@ -22,4 +23,7 @@ object AppConfig {
 
     /** Publishable (anon) key for the existing TECH VISION DZ Supabase project. */
     const val SUPABASE_ANON_KEY: String = BuildConfig.SUPABASE_ANON_KEY
+
+    /** Public TECH VISION DZ website base URL, used for canonical article share links. */
+    const val ARTICLE_BASE_URL: String = BuildConfig.ARTICLE_BASE_URL
 }

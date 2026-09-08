@@ -1,6 +1,5 @@
 package com.techvisiondz.app.feature.article
 
-import android.text.Html
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,10 +26,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.Article
@@ -38,20 +40,29 @@ import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
 import com.techvisiondz.app.core.ui.components.LoadingState
 import com.techvisiondz.app.core.ui.formatPublishedAt
+import com.techvisiondz.app.core.ui.formatViewsCount
+import com.techvisiondz.app.core.util.htmlBodySpanned
+import com.techvisiondz.app.core.util.spannedToAnnotatedString
 
 /**
  * Article details screen.
  *
  * Loads the selected article by slug through the [ArticleDetailViewModel] and
- * renders it RTL-first: a top bar with back navigation, the cover image, title,
- * author/category/date metadata, tags, excerpt and the HTML article body.
- * Missing content and failures show dedicated empty/error states with retry.
+ * renders it RTL-first: a top bar with back navigation, a native share action,
+ * the cover image, title, author/category/date metadata, reading time, views,
+ * tags, excerpt and the article body (bold/italic preserved, body links open
+ * in the system browser). Missing content and failures show dedicated
+ * empty/error states with retry.
+ *
+ * [onShareArticle] stays an optional callback so screens can test the action
+ * deterministically; the production wiring launches the Android sharesheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticleDetailScreen(
     viewModel: ArticleDetailViewModel,
     onBack: () -> Unit,
+    onShareArticle: ((Article) -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -73,6 +84,17 @@ fun ArticleDetailScreen(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back),
                         )
+                    }
+                },
+                actions = {
+                    val state = uiState
+                    if (state is UiState.Success && onShareArticle != null) {
+                        IconButton(onClick = { onShareArticle(state.data) }) {
+                            Icon(
+                                imageVector = Icons.Filled.Share,
+                                contentDescription = stringResource(R.string.share_article),
+                            )
+                        }
                     }
                 },
             )
@@ -135,6 +157,19 @@ private fun ArticleDetailContent(article: Article) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val details = buildList {
+            article.readingTimeMinutes?.takeIf { it > 0 }?.let { minutes ->
+                add(pluralStringResource(R.plurals.reading_time_minutes, minutes, minutes))
+            }
+            add(stringResource(R.string.article_views, formatViewsCount(article.viewsCount)))
+        }.joinToString(" · ")
+        if (details.isNotBlank()) {
+            Text(
+                text = details,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (article.tags.isNotEmpty()) {
             Text(
                 text = article.tags.joinToString(" · ") { it.label },
@@ -149,11 +184,15 @@ private fun ArticleDetailContent(article: Article) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        val body = htmlToPlainText(article.body)
-        if (body.isNotBlank()) {
+        val bodySpanned = htmlBodySpanned(article.body)
+        if (bodySpanned != null && bodySpanned.isNotBlank()) {
+            val linkColor = MaterialTheme.colorScheme.primary
             Text(
-                text = body,
-                style = MaterialTheme.typography.bodyLarge,
+                text = spannedToAnnotatedString(
+                    spanned = bodySpanned,
+                    linkColor = linkColor,
+                ),
+                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
             )
         }
         article.software?.let { software ->
@@ -170,14 +209,4 @@ private fun ArticleDetailContent(article: Article) {
             }
         }
     }
-}
-
-/**
- * Converts the article's rich HTML body (as produced by the website) into
- * plain text for display. The video reference is intentionally not rendered:
- * embedding a player is a separate future feature.
- */
-private fun htmlToPlainText(html: String?): String {
-    if (html.isNullOrBlank()) return ""
-    return Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY).toString().trim()
 }

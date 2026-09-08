@@ -34,6 +34,9 @@ android {
         // overridden per environment below.
         buildConfigField("String", "SUPABASE_URL", "\"${secret("TECHVISION_SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("TECHVISION_SUPABASE_ANON_KEY")}\"")
+        // Public article website base used to build canonical share URLs. Public,
+        // not a secret — kept here to follow the same config architecture.
+        buildConfigField("String", "ARTICLE_BASE_URL", "\"${secret("TECHVISION_ARTICLE_BASE_URL")}\"")
     }
 
     buildTypes {

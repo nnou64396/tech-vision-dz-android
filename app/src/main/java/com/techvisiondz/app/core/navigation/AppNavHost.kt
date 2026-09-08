@@ -2,13 +2,19 @@ package com.techvisiondz.app.core.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.techvisiondz.app.R
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.data.repository.SupabaseArticleRepository
+import com.techvisiondz.app.core.util.ArticleUrlBuilder
+import com.techvisiondz.app.core.util.launchArticleShareChooser
 import com.techvisiondz.app.feature.article.ArticleDetailScreen
 import com.techvisiondz.app.feature.article.ArticleDetailViewModel
 import com.techvisiondz.app.feature.author.AuthorArticlesScreen
@@ -40,6 +46,8 @@ fun AppNavHost(
     repository: ArticleRepository = remember { SupabaseArticleRepository() },
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val shareArticleLabel = stringResource(R.string.share_article)
 
     NavHost(
         navController = navController,
@@ -70,6 +78,19 @@ fun AppNavHost(
                     key = "article-detail-$slug",
                     factory = ArticleDetailViewModel.factory(slug, repository),
                 ),
+                onShareArticle = { article ->
+                    val url = runCatching {
+                        ArticleUrlBuilder.buildArticleUrl(AppConfig.ARTICLE_BASE_URL, article.slug)
+                    }.getOrNull()
+                    if (url != null) {
+                        launchArticleShareChooser(
+                            context = context,
+                            url = url,
+                            title = article.title,
+                            chooserTitle = shareArticleLabel,
+                        )
+                    }
+                },
             )
         }
         composable<Routes.Categories> {

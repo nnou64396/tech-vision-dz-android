@@ -7,6 +7,16 @@
     <string name="article_not_found">المقال غير موجود</string>
     <string name="article_error">تعذر تحميل المقال</string>
     <string name="article_software">البرمجيات: %1$s</string>
+    <string name="article_views">%1$s مشاهدة</string>
+    <string name="share_article">مشاركة المقال</string>
+    <plurals name="reading_time_minutes">
+        <item quantity="zero">٠ دقائق للقراءة</item>
+        <item quantity="one">دقيقة واحدة للقراءة</item>
+        <item quantity="two">دقيقتان للقراءة</item>
+        <item quantity="few">%d دقائق للقراءة</item>
+        <item quantity="many">%d دقيقة للقراءة</item>
+        <item quantity="other">%d دقيقة للقراءة</item>
+    </plurals>
     <string name="back">رجوع</string>
     <string name="categories">الفئات</string>
     <string name="authors">المؤلفون</string>

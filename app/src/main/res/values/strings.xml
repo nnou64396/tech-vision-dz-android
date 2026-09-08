@@ -6,6 +6,12 @@
     <string name="article_not_found">Article not found</string>
     <string name="article_error">Could not load the article</string>
     <string name="article_software">Software: %1$s</string>
+    <string name="article_views">%1$s views</string>
+    <string name="share_article">Share article</string>
+    <plurals name="reading_time_minutes">
+        <item quantity="one">%d minute read</item>
+        <item quantity="other">%d minutes read</item>
+    </plurals>
     <string name="back">Back</string>
     <string name="categories">Categories</string>
     <string name="authors">Authors</string>

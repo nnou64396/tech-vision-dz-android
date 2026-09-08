@@ -1,5 +1,6 @@
 package com.techvisiondz.app.core.ui
 
+import java.text.NumberFormat
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -18,3 +19,10 @@ fun formatPublishedAt(iso: String): String {
         ""
     }
 }
+
+/**
+ * Formats an article view count with locale grouping, e.g. "1,234" (or Arabic
+ * digits for an Arabic locale). Purely presentational — never increments.
+ */
+fun formatViewsCount(count: Long, locale: Locale = Locale.getDefault()): String =
+    NumberFormat.getIntegerInstance(locale).format(count)
