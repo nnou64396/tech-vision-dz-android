@@ -21,6 +21,8 @@ import com.techvisiondz.app.feature.category.CategoryListScreen
 import com.techvisiondz.app.feature.category.CategoryViewModel
 import com.techvisiondz.app.feature.home.HomeScreen
 import com.techvisiondz.app.feature.home.HomeViewModel
+import com.techvisiondz.app.feature.search.SearchScreen
+import com.techvisiondz.app.feature.search.SearchViewModel
 import com.techvisiondz.app.feature.tag.TagArticlesScreen
 import com.techvisiondz.app.feature.tag.TagArticlesViewModel
 import com.techvisiondz.app.feature.tag.TagListScreen
@@ -46,10 +48,18 @@ fun AppNavHost(
         composable<Routes.Home> {
             HomeScreen(
                 onArticleClick = { slug -> navController.navigate(Routes.ArticleDetail(slug)) },
+                onSearchClick = { navController.navigate(Routes.Search) },
                 onCategoriesClick = { navController.navigate(Routes.Categories) },
                 onAuthorsClick = { navController.navigate(Routes.Authors) },
                 onTagsClick = { navController.navigate(Routes.Tags) },
                 viewModel = viewModel(factory = HomeViewModel.factory(repository)),
+            )
+        }
+        composable<Routes.Search> {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onArticleClick = { slug -> navController.navigate(Routes.ArticleDetail(slug)) },
+                viewModel = viewModel(factory = SearchViewModel.factory(repository)),
             )
         }
         composable<Routes.ArticleDetail> { backStackEntry ->

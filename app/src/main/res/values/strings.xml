@@ -19,4 +19,11 @@
     <string name="categories_error">Could not load the categories</string>
     <string name="authors_error">Could not load the authors</string>
     <string name="tags_error">Could not load the tags</string>
+    <string name="search">Search</string>
+    <string name="search_articles">Search articles</string>
+    <string name="search_placeholder">What are you looking for?</string>
+    <string name="search_no_results">No results for "%1$s"</string>
+    <string name="search_error">Could not load search results</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_hint">Type to search articles</string>
 </resources>

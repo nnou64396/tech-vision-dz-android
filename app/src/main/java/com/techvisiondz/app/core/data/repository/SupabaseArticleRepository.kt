@@ -107,6 +107,29 @@ class SupabaseArticleRepository(
     override suspend fun getArticlesByTag(slug: String, languageCode: String): List<ArticleCard> =
         runTranslated { rpcArticleCards(GET_PUBLISHED_ARTICLE_CARDS_BY_TAG, slug, languageCode) }
 
+    override suspend fun searchArticles(query: String, languageCode: String, limit: Int): List<ArticleCard> {
+        val normalized = query.trim()
+        if (normalized.isEmpty()) return emptyList()
+        val pattern = "*$normalized*"
+        return runTranslated {
+            postgrest.from("articles")
+                .select(Columns.raw(SEARCH_SELECT)) {
+                    filter { eq("status", "published") }
+                    filter { eq("article_translations.language_code", languageCode) }
+                    filter {
+                        or(referencedTable = "article_translations") {
+                            ilike("title", pattern)
+                            ilike("excerpt", pattern)
+                        }
+                    }
+                    order("published_at", Order.DESCENDING, nullsFirst = true)
+                    limit(limit.toLong())
+                }
+                .decodeList<ArticleFeedRow>()
+                .mapNotNull { it.toArticleCard(languageCode, ::resolvePublicUrl) }
+        }
+    }
+
     private suspend fun rpcArticleCards(function: String, slug: String, languageCode: String): List<ArticleCard> {
         val result = postgrest.rpc(
             function = function,
@@ -181,6 +204,60 @@ class SupabaseArticleRepository(
             reading_time_minutes,
             views_count,
             article_translations(
+                language_code,
+                title,
+                slug,
+                excerpt
+            ),
+            authors(
+                id,
+                slug,
+                avatar_url,
+                is_active,
+                author_translations(
+                    language_code,
+                    display_name,
+                    bio,
+                    slug
+                )
+            ),
+            categories(
+                id,
+                slug,
+                is_active,
+                category_translations(
+                    language_code,
+                    name,
+                    slug,
+                    description
+                )
+            ),
+            article_media(
+                role,
+                sort_order,
+                caption,
+                media(
+                    id,
+                    type,
+                    storage_path,
+                    bucket,
+                    alt_text
+                )
+            )
+        """
+
+        // Same shape as the home feed but `article_translations` is embedded with
+        // `!inner` so PostgREST drops articles that have no matching translation,
+        // and the title/excerpt ILIKE filter is applied via an `or(...)` logical
+        // expression scoped to that embed.
+        const val SEARCH_SELECT = """
+            id,
+            status,
+            featured,
+            published_at,
+            reading_time_minutes,
+            views_count,
+            article_translations!inner(
                 language_code,
                 title,
                 slug,

@@ -43,4 +43,12 @@ interface ArticleRepository {
 
     /** Loads published article cards for a tag slug via the backend RPC. */
     suspend fun getArticlesByTag(slug: String, languageCode: String = "ar"): List<ArticleCard>
+
+    /**
+     * Searches published article cards whose [languageCode] translation title
+     * or excerpt contains [query] (case-insensitive ILIKE), newest first,
+     * limited to [limit] results. Implementations trim [query]; a blank query
+     * yields an empty list without any request.
+     */
+    suspend fun searchArticles(query: String, languageCode: String = "ar", limit: Int = 30): List<ArticleCard>
 }

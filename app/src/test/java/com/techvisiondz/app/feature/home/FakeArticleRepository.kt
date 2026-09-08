@@ -20,6 +20,8 @@ class FakeArticleRepository(
     categoryArticles: Map<String, List<ArticleCard>> = emptyMap(),
     authorArticles: Map<String, List<ArticleCard>> = emptyMap(),
     tagArticles: Map<String, List<ArticleCard>> = emptyMap(),
+    searchResults: List<ArticleCard> = emptyList(),
+    searchError: Exception? = null,
 ) : ArticleRepository {
 
     /** Reassignable so tests can simulate updated content on a subsequent load. */
@@ -51,6 +53,22 @@ class FakeArticleRepository(
     var authorArticles: Map<String, List<ArticleCard>> = authorArticles
 
     var tagArticles: Map<String, List<ArticleCard>> = tagArticles
+
+    /** Results returned by [searchArticles]; empty by default. */
+    var searchResults: List<ArticleCard> = searchResults
+
+    /** When set, [searchArticles] throws it instead of returning results. */
+    var searchError: Exception? = searchError
+
+    /** Last query handed to [searchArticles], after the ViewModel normalizes it. */
+    var lastSearchQuery: String? = null
+        private set
+
+    var lastSearchLanguage: String? = null
+        private set
+
+    var searchCalls: Int = 0
+        private set
 
     override suspend fun getHomeFeed(languageCode: String): List<ArticleCard> {
         lastLanguageCode = languageCode
@@ -102,6 +120,14 @@ class FakeArticleRepository(
         lastLanguageCode = languageCode
         error?.let { throw it }
         return tagArticles[slug] ?: emptyList()
+    }
+
+    override suspend fun searchArticles(query: String, languageCode: String, limit: Int): List<ArticleCard> {
+        lastSearchQuery = query
+        lastSearchLanguage = languageCode
+        searchCalls++
+        searchError?.let { throw it }
+        return searchResults
     }
 }
 

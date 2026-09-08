@@ -17,6 +17,9 @@ object Routes {
     data class ArticleDetail(val slug: String)
 
     @Serializable
+    data object Search
+
+    @Serializable
     data object Categories
 
     @Serializable

@@ -20,4 +20,11 @@
     <string name="categories_error">تعذر تحميل الفئات</string>
     <string name="authors_error">تعذر تحميل المؤلفين</string>
     <string name="tags_error">تعذر تحميل الوسوم</string>
+    <string name="search">بحث</string>
+    <string name="search_articles">ابحث عن المقالات</string>
+    <string name="search_placeholder">ما الذي تبحث عنه؟</string>
+    <string name="search_no_results">لا توجد نتائج لـ "%1$s"</string>
+    <string name="search_error">تعذر تحميل نتائج البحث</string>
+    <string name="search_clear">مسح البحث</string>
+    <string name="search_hint">اكتب للبحث عن المقالات</string>
 </resources>
