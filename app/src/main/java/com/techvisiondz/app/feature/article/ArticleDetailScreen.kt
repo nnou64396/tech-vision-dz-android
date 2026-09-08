@@ -1,12 +1,20 @@
 package com.techvisiondz.app.feature.article
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -14,18 +22,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -36,22 +50,26 @@ import coil3.compose.AsyncImage
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.ui.UiState
+import com.techvisiondz.app.core.ui.components.CategoryChip
 import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
 import com.techvisiondz.app.core.ui.components.LoadingState
+import com.techvisiondz.app.core.ui.components.TechGradientButton
 import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.core.ui.formatViewsCount
 import com.techvisiondz.app.core.util.htmlBodySpanned
 import com.techvisiondz.app.core.util.spannedToAnnotatedString
+import com.techvisiondz.app.ui.theme.TechVisionRadii
+import com.techvisiondz.app.ui.theme.TechVisionSpacing
+import com.techvisiondz.app.ui.theme.brandGradient
 
 /**
- * Article details screen.
+ * Article details screen — the app's premium editorial surface.
  *
- * Loads the selected article by slug through the [ArticleDetailViewModel] and
- * renders it RTL-first: a top bar with back navigation, a native share action,
- * the cover image, title, author/category/date metadata, reading time, views,
- * tags, excerpt and the article body (bold/italic preserved, body links open
- * in the system browser). Missing content and failures show dedicated
+ * Hierarchy mirrors the website: hero image → category chip → large title →
+ * bordered metadata pill → reading time + views → excerpt → comfortable body →
+ * tag pills → software callout. The top bar keeps back navigation and the
+ * native share action (Phase 5). Missing content and failures show dedicated
  * empty/error states with retry.
  *
  * [onShareArticle] stays an optional callback so screens can test the action
@@ -68,36 +86,50 @@ fun ArticleDetailScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = (uiState as? UiState.Success)?.data?.title
-                            ?: stringResource(R.string.app_name),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = (uiState as? UiState.Success)?.data?.title
+                                ?: stringResource(R.string.app_name),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                },
-                actions = {
-                    val state = uiState
-                    if (state is UiState.Success && onShareArticle != null) {
-                        IconButton(onClick = { onShareArticle(state.data) }) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
                             Icon(
-                                imageVector = Icons.Filled.Share,
-                                contentDescription = stringResource(R.string.share_article),
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
                             )
                         }
-                    }
-                },
-            )
+                    },
+                    actions = {
+                        val state = uiState
+                        if (state is UiState.Success && onShareArticle != null) {
+                            IconButton(onClick = { onShareArticle(state.data) }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = stringResource(R.string.share_article),
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                        actionIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    ),
+                )
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            }
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -119,14 +151,19 @@ fun ArticleDetailScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ArticleDetailContent(article: Article) {
+    val uriHandler = LocalUriHandler.current
+    val placeholderColor = MaterialTheme.colorScheme.surfaceContainerHighest
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = TechVisionSpacing.Lg)
+            .padding(top = TechVisionSpacing.Md, bottom = TechVisionSpacing.Xl),
+        verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
     ) {
         article.coverUrl?.let { coverUrl ->
             AsyncImage(
@@ -134,16 +171,24 @@ private fun ArticleDetailContent(article: Article) {
                 contentDescription = article.coverAlt ?: article.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(TechVisionRadii.Lg)),
                 contentScale = ContentScale.Crop,
+                placeholder = ColorPainter(placeholderColor),
+                error = ColorPainter(placeholderColor),
             )
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
         }
+
+        article.category?.name?.takeIf { it.isNotBlank() }?.let { CategoryChip(label = it) }
+
         Text(
             text = article.title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
         )
+
         val meta = buildList {
             article.author?.name?.takeIf { it.isNotBlank() }?.let(::add)
             article.category?.name?.takeIf { it.isNotBlank() }?.let(::add)
@@ -151,12 +196,20 @@ private fun ArticleDetailContent(article: Article) {
             if (date.isNotBlank()) add(date)
         }.joinToString(" · ")
         if (meta.isNotBlank()) {
-            Text(
-                text = meta,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Surface(
+                shape = RoundedCornerShape(TechVisionRadii.Md),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = TechVisionSpacing.Lg, vertical = TechVisionSpacing.Md),
+                )
+            }
         }
+
         val details = buildList {
             article.readingTimeMinutes?.takeIf { it > 0 }?.let { minutes ->
                 add(pluralStringResource(R.plurals.reading_time_minutes, minutes, minutes))
@@ -170,42 +223,96 @@ private fun ArticleDetailContent(article: Article) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (article.tags.isNotEmpty()) {
+
+        article.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
             Text(
-                text = article.tags.joinToString(" · ") { it.label },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline,
-            )
-        }
-        if (!article.excerpt.isNullOrBlank()) {
-            Text(
-                text = article.excerpt,
-                style = MaterialTheme.typography.titleMedium,
+                text = excerpt,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+
         val bodySpanned = htmlBodySpanned(article.body)
         if (bodySpanned != null && bodySpanned.isNotBlank()) {
-            val linkColor = MaterialTheme.colorScheme.primary
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
             Text(
                 text = spannedToAnnotatedString(
                     spanned = bodySpanned,
-                    linkColor = linkColor,
+                    linkColor = MaterialTheme.colorScheme.primary,
                 ),
-                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 17.sp,
+                    lineHeight = 32.sp,
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
             )
         }
+
+        if (article.tags.isNotEmpty()) {
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+                verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+            ) {
+                article.tags.forEach { tag ->
+                    Surface(
+                        shape = TechVisionRadii.Full,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Text(
+                            text = tag.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = TechVisionSpacing.Md, vertical = 6.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+
         article.software?.let { software ->
             val softwareText = buildString {
                 append(software.name)
                 software.version?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
             }
             if (softwareText.isNotBlank()) {
-                Text(
-                    text = stringResource(R.string.article_software, softwareText),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+                Surface(
+                    shape = RoundedCornerShape(TechVisionRadii.Lg),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(TechVisionSpacing.Lg),
+                        verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Md),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 4.dp, height = 40.dp)
+                                    .clip(RoundedCornerShape(TechVisionRadii.Sm))
+                                    .background(brush = MaterialTheme.colorScheme.brandGradient()),
+                            )
+                            Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
+                            Text(
+                                text = stringResource(R.string.article_software, softwareText),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                        software.downloadUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                            TechGradientButton(
+                                text = stringResource(R.string.download),
+                                onClick = { uriHandler.openUri(url) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
             }
         }
     }

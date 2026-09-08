@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.author
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,14 +15,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -33,11 +36,14 @@ import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.ui.components.BackTopBarScreen
 import com.techvisiondz.app.core.ui.components.DiscoveryContent
+import com.techvisiondz.app.ui.theme.TechVisionElevation
+import com.techvisiondz.app.ui.theme.TechVisionRadii
+import com.techvisiondz.app.ui.theme.TechVisionSpacing
 
 /**
- * Authors discovery screen. Renders the localized authors; a selection navigates
- * onward by the author slug. An avatar is shown only when the backend provides
- * one - nothing is invented.
+ * Authors discovery screen. Renders the localized authors as bordered rows with a
+ * ringed avatar when the backend provides one — nothing is invented — and a
+ * selection navigates onward by the author slug.
  */
 @Composable
 fun AuthorListScreen(
@@ -63,7 +69,10 @@ fun AuthorListScreen(
 
 @Composable
 private fun AuthorList(authors: List<Author>, onAuthorClick: (String) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(vertical = TechVisionSpacing.Sm),
+    ) {
         items(items = authors, key = { it.id }) { author ->
             AuthorCard(author = author, onClick = { onAuthorClick(author.slug) })
         }
@@ -72,35 +81,46 @@ private fun AuthorList(authors: List<Author>, onAuthorClick: (String) -> Unit) {
 
 @Composable
 private fun AuthorCard(author: Author, onClick: () -> Unit) {
-    Card(
+    Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = TechVisionSpacing.Lg, vertical = 5.dp)
             .testTag("author_item_${author.slug}"),
+        shape = RoundedCornerShape(TechVisionRadii.Lg),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = TechVisionElevation.Flat,
     ) {
-        Row(modifier = Modifier.padding(12.dp)) {
+        Row(modifier = Modifier.padding(TechVisionSpacing.Md)) {
             author.avatarUrl?.let { avatarUrl ->
                 AsyncImage(
                     model = avatarUrl,
                     contentDescription = author.name,
-                    modifier = Modifier.size(48.dp).clip(CircleShape),
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .padding(2.dp)
+                        .clip(CircleShape),
                     contentScale = ContentScale.Crop,
+                    placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    error = ColorPainter(MaterialTheme.colorScheme.surfaceContainerHighest),
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = author.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (!author.bio.isNullOrBlank()) {
+                author.bio?.takeIf { it.isNotBlank() }?.let { bio ->
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = author.bio,
+                        text = bio,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 3,

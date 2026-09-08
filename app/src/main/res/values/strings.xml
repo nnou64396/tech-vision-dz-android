@@ -13,6 +13,9 @@
         <item quantity="other">%d minutes read</item>
     </plurals>
     <string name="back">Back</string>
+    <string name="loading">Loading</string>
+    <string name="home_feed">Latest articles</string>
+    <string name="download">Download</string>
     <string name="categories">Categories</string>
     <string name="authors">Authors</string>
     <string name="tags">Tags</string>

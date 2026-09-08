@@ -1,16 +1,25 @@
 package com.techvisiondz.app.core.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -18,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.techvisiondz.app.R
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
 
-/** Centered loading indicator used while data is being fetched. */
+/** Branded loading state: the site's spinner tone + a loading label. */
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Column(
@@ -26,60 +35,85 @@ fun LoadingState(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(
+            modifier = Modifier.size(40.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 3.dp,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.loading),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
-/** Centered error message with an optional retry action. */
+/** Branded error state with an icon glyph, message and a gradient Retry button. */
 @Composable
 fun ErrorState(
     message: String,
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
 ) {
-    StateMessage(
-        title = message,
-        modifier = modifier,
-        action = onRetry?.let { retry ->
-            {
-                Button(onClick = retry) {
-                    Text(text = stringResource(R.string.retry))
-                }
-            }
-        },
-    )
-}
-
-/** Empty state shown when a request succeeds but returns no content. */
-@Composable
-fun EmptyState(
-    message: String,
-    modifier: Modifier = Modifier,
-) {
-    StateMessage(
-        title = message,
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun StateMessage(
-    title: String,
-    modifier: Modifier = Modifier,
-    action: (@Composable () -> Unit)? = null,
-) {
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        StateGlyph(
+            icon = Icons.Filled.Warning,
+            tint = MaterialTheme.colorScheme.error,
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        action?.invoke()
+        onRetry?.let { retry ->
+            Spacer(modifier = Modifier.height(20.dp))
+            TechGradientButton(text = stringResource(R.string.retry), onClick = retry)
+        }
+    }
+}
+
+/** Branded empty state anchored by the gradient wordmark. */
+@Composable
+fun EmptyState(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CenterBrandMark(
+            message = message,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun StateGlyph(icon: ImageVector, tint: Color, containerColor: Color) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = containerColor,
+        modifier = Modifier.size(64.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(28.dp),
+            )
+        }
     }
 }
 

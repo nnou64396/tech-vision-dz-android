@@ -18,6 +18,9 @@
         <item quantity="other">%d دقيقة للقراءة</item>
     </plurals>
     <string name="back">رجوع</string>
+    <string name="loading">جارٍ التحميل</string>
+    <string name="home_feed">أحدث المقالات</string>
+    <string name="download">تحميل</string>
     <string name="categories">الفئات</string>
     <string name="authors">المؤلفون</string>
     <string name="tags">الوسوم</string>
