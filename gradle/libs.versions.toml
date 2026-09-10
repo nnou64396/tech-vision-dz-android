@@ -36,6 +36,7 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
+supabase-gotrue = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
 supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
 supabase-storage = { group = "io.github.jan-tennert.supabase", name = "storage-kt" }
 ktor-bom = { group = "io.ktor", name = "ktor-bom", version.ref = "ktor" }

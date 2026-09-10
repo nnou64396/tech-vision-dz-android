@@ -74,6 +74,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.gotrue)
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.storage)
     implementation(platform(libs.ktor.bom))
