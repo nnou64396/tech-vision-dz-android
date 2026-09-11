@@ -22,8 +22,8 @@ import org.junit.Test
 /**
  * Saved-articles navigation tests using fakes for every repository so the
  * whole flow is deterministic: open Saved Articles from Account, confirm the
- * empty/list states, open a saved article's details, and confirm the
- * unauthenticated guard removes access.
+ * empty/list states, open a saved article's details, and confirm that losing
+ * the session returns the user to the public Home.
  */
 class SavedNavigationTest {
 
@@ -86,7 +86,7 @@ class SavedNavigationTest {
     }
 
     @Test
-    fun signingOutWhileOnSavedArticlesReturnsToTheAuthScreen() {
+    fun signingOutWhileOnSavedArticlesReturnsToPublicHome() {
         val authRepository = FakeAuthRepository.authenticated()
         setContent(authRepository = authRepository)
 
@@ -96,6 +96,7 @@ class SavedNavigationTest {
         authRepository.forceUnauthenticated()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.auth_sign_in_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_account").assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.auth_sign_in_title)).assertDoesNotExist()
     }
 }

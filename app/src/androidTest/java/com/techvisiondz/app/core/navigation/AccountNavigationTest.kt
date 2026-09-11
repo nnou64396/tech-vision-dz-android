@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.repository.FakeAuthRepository
 import com.techvisiondz.app.core.data.repository.FakeProfileRepository
@@ -19,8 +20,9 @@ import org.junit.Test
 /**
  * Account-profile navigation tests using a fake [ProfileRepository] and a fake
  * [com.techvisiondz.app.core.data.repository.AuthRepository] so the whole flow
- * is deterministic: open Account from Home, sign out, and confirm the user is
- * returned to the auth graph.
+ * is deterministic: Account stays authenticated-only (guests are sent to Sign
+ * In and land on Account after signing in), and signing out returns to the
+ * public Home instead of the auth flow.
  */
 class AccountNavigationTest {
 
@@ -57,7 +59,39 @@ class AccountNavigationTest {
     }
 
     @Test
-    fun signOutReturnsUserToSignInScreen() {
+    fun guestAccountClickRequiresSignInThenOpensAccount() {
+        composeRule.setContent {
+            TechVisionDzTheme {
+                AppNavHost(
+                    repository = FakeArticleRepository(articles = emptyList()),
+                    authRepository = FakeAuthRepository.unauthenticated(),
+                    profileRepository = FakeProfileRepository(
+                        profile = sampleUserProfile(
+                            id = "test-user",
+                            email = "reader@example.com",
+                            displayName = "Yasmine",
+                        ),
+                    ),
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_account").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("sign_in_email").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("sign_in_email").performTextInput("reader@example.com")
+        composeRule.onNodeWithTag("sign_in_password").performTextInput("password123")
+        composeRule.onNodeWithTag("sign_in_submit").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.account_title)).assertIsDisplayed()
+        composeRule.onNodeWithText("reader@example.com").assertIsDisplayed()
+    }
+
+    @Test
+    fun signingOutOnAccountReturnsToPublicHome() {
         composeRule.setContent {
             TechVisionDzTheme {
                 AppNavHost(
@@ -74,6 +108,7 @@ class AccountNavigationTest {
         composeRule.onNodeWithTag("account_sign_out").performClick()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.auth_sign_in_title)).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_account").assertIsDisplayed()
+        composeRule.onNodeWithTag("sign_in_email").assertDoesNotExist()
     }
 }

@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.article
 
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.auth.AuthError
@@ -49,7 +50,7 @@ class ArticleDetailViewModelTest {
         assertTrue(state is UiState.Success)
         assertEquals("hello-world", (state as UiState.Success).data.slug)
         assertEquals("hello-world", repository.lastArticleSlug)
-        assertEquals("ar", repository.lastLanguageCode)
+        assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastLanguageCode)
     }
 
     @Test

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.data.repository.SupabaseArticleRepository
 import com.techvisiondz.app.core.ui.UiState
@@ -25,7 +26,7 @@ import kotlinx.coroutines.launch
  */
 class HomeViewModel(
     private val repository: ArticleRepository,
-    private val defaultLanguage: String = "ar",
+    private val defaultLanguage: String = AppConfig.DEFAULT_LANGUAGE_CODE,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<HomeContent>>(UiState.Loading)

@@ -26,4 +26,12 @@ object AppConfig {
 
     /** Public TECH VISION DZ website base URL, used for canonical article share links. */
     const val ARTICLE_BASE_URL: String = BuildConfig.ARTICLE_BASE_URL
+
+    /**
+     * Default language code for public content. Production source articles are
+     * authored in Algerian Darija ('arq'); 'ar' is only an AI-produced target
+     * translation, so every public query must default to 'arq' to match the
+     * backend source content.
+     */
+    const val DEFAULT_LANGUAGE_CODE: String = "arq"
 }

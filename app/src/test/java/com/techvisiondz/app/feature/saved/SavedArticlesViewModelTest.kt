@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.saved
 
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.home.sampleArticleCard
@@ -51,6 +52,17 @@ class SavedArticlesViewModelTest {
         assertEquals(listOf("article-1", "article-2"), (state as UiState.Success).data.map { it.id })
         assertEquals(1, repository.getSavedCalls)
         assertTrue(viewModel.hasLoadedOnce)
+    }
+
+    @Test
+    fun `defaults to the app source language for saved articles`() = runTest(dispatcher) {
+        val repository = FakeSavedArticleRepository(savedArticles = listOf(sampleArticleCard(id = "article-1")))
+        val viewModel = SavedArticlesViewModel(repository)
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is UiState.Success)
+        assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastRequestedLanguage)
     }
 
     @Test

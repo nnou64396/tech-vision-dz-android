@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.search
 
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.home.FakeArticleRepository
@@ -48,7 +49,7 @@ class SearchViewModelTest {
         assertTrue(state is UiState.Success)
         assertEquals("نتيجة البحث", (state as UiState.Success).data.single().title)
         assertEquals("android", repository.lastSearchQuery)
-        assertEquals("ar", repository.lastSearchLanguage)
+        assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastSearchLanguage)
         assertEquals(1, repository.searchCalls)
     }
 

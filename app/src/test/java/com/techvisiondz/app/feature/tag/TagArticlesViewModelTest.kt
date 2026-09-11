@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.tag
 
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.home.FakeArticleRepository
@@ -44,7 +45,7 @@ class TagArticlesViewModelTest {
         assertTrue(state is UiState.Success)
         assertEquals(cards, (state as UiState.Success).data)
         assertEquals("ai", repository.lastArticleSlug)
-        assertEquals("ar", repository.lastLanguageCode)
+        assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastLanguageCode)
     }
 
     @Test

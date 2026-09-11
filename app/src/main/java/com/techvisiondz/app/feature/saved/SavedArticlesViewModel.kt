@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.data.repository.SavedArticleRepository
 import com.techvisiondz.app.core.data.repository.SupabaseSavedArticleRepository
@@ -26,7 +27,7 @@ import kotlinx.coroutines.launch
  */
 class SavedArticlesViewModel(
     private val savedArticleRepository: SavedArticleRepository,
-    private val defaultLanguage: String = "ar",
+    private val defaultLanguage: String = AppConfig.DEFAULT_LANGUAGE_CODE,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<List<ArticleCard>>>(UiState.Loading)

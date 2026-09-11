@@ -26,6 +26,9 @@ class FakeSavedArticleRepository(
     var getSavedCalls: Int = 0
         private set
 
+    var lastRequestedLanguage: String? = null
+        private set
+
     var isArticleSavedCalls: List<String> = emptyList()
         private set
 
@@ -38,6 +41,7 @@ class FakeSavedArticleRepository(
     override suspend fun getSavedArticles(languageCode: String): List<ArticleCard> {
         delay(1)
         getSavedCalls++
+        lastRequestedLanguage = languageCode
         error?.let { throw it }
         return savedArticles
     }

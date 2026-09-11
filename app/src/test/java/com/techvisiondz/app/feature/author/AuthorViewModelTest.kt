@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.author
 
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.home.FakeArticleRepository
@@ -42,7 +43,7 @@ class AuthorViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
         assertEquals(listOf(sampleAuthor()), (state as UiState.Success).data)
-        assertEquals("ar", repository.lastLanguageCode)
+        assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastLanguageCode)
     }
 
     @Test

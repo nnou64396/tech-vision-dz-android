@@ -3,12 +3,11 @@ package com.techvisiondz.app.core.navigation
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
-import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.repository.FakeAuthRepository
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
@@ -18,9 +17,11 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Auth-gating navigation tests: verifies the correct screen is shown for each
- * [com.techvisiondz.app.core.data.AuthState] and that a successful sign-in
- * transitions to the Home screen.
+ * Auth-navigation tests for the public-by-default graph: public content is
+ * always visible (even while [com.techvisiondz.app.core.data.AuthState.Loading]
+ * restores the session), guests are never evicted from public screens, and
+ * authentication is only required for protected actions such as saving an
+ * article.
  */
 class AuthNavigationTest {
 
@@ -28,8 +29,10 @@ class AuthNavigationTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun loadingStateShowsFullScreenLoading() {
-        val articleRepository = FakeArticleRepository(articles = emptyList())
+    fun loadingStateDoesNotBlockPublicHome() {
+        val articleRepository = FakeArticleRepository(
+            articles = listOf(sampleArticleCard(id = "a1", title = "المقال الأول")),
+        )
         val authRepository = FakeAuthRepository()
 
         composeRule.setContent {
@@ -42,14 +45,14 @@ class AuthNavigationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule
-            .onNodeWithText(composeRule.activity.getString(R.string.loading))
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("المقال الأول").assertIsDisplayed()
     }
 
     @Test
-    fun unauthenticatedStateShowsSignIn() {
-        val articleRepository = FakeArticleRepository(articles = emptyList())
+    fun unauthenticatedStateShowsPublicHomeFeed() {
+        val articleRepository = FakeArticleRepository(
+            articles = listOf(sampleArticleCard(id = "a1", title = "المقال الأول")),
+        )
         val authRepository = FakeAuthRepository.unauthenticated()
 
         composeRule.setContent {
@@ -62,8 +65,8 @@ class AuthNavigationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag("sign_in_email").assertIsDisplayed()
-        composeRule.onNodeWithTag("sign_in_password").assertIsDisplayed()
+        composeRule.onNodeWithText("المقال الأول").assertIsDisplayed()
+        composeRule.onNodeWithTag("sign_in_email").assertDoesNotExist()
     }
 
     @Test
@@ -87,10 +90,11 @@ class AuthNavigationTest {
     }
 
     @Test
-    fun signInSuccessNavigatesToHomeFeed() {
+    fun guestCanBrowsePublicArticleDetail() {
         val articleRepository = FakeArticleRepository(
-            articles = listOf(sampleArticleCard(id = "a1", title = "مرحبا بالعالم")),
+            articles = listOf(sampleArticleCard(id = "a1", title = "المقال الأول")),
         )
+        articleRepository.detailArticle = sampleArticle(slug = "sample-a1", title = "تفاصيل المقال")
         val authRepository = FakeAuthRepository.unauthenticated()
 
         composeRule.setContent {
@@ -103,11 +107,73 @@ class AuthNavigationTest {
         }
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag("article_card_sample-a1").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onAllNodesWithText("تفاصيل المقال")[0].assertIsDisplayed()
+    }
+
+    @Test
+    fun guestBookmarkRequiresSignInAndReturnsToArticle() {
+        val articleRepository = FakeArticleRepository(
+            articles = listOf(sampleArticleCard(id = "a1", title = "المقال الأول")),
+        )
+        articleRepository.detailArticle = sampleArticle(slug = "sample-a1", title = "تفاصيل المقال")
+        val authRepository = FakeAuthRepository.unauthenticated()
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                AppNavHost(
+                    repository = articleRepository,
+                    authRepository = authRepository,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("article_card_sample-a1").performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("تفاصيل المقال")[0].assertIsDisplayed()
+
+        composeRule.onNodeWithTag("article_bookmark").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("sign_in_email").assertIsDisplayed()
+
         composeRule.onNodeWithTag("sign_in_email").performTextInput("reader@example.com")
         composeRule.onNodeWithTag("sign_in_password").performTextInput("password123")
         composeRule.onNodeWithTag("sign_in_submit").performClick()
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("مرحبا بالعالم").assertIsDisplayed()
+        composeRule.onAllNodesWithText("تفاصيل المقال")[0].assertIsDisplayed()
+        composeRule.onNodeWithTag("article_bookmark").assertIsDisplayed()
+    }
+
+    @Test
+    fun unauthenticatedStateDoesNotEvictPublicScreens() {
+        val articleRepository = FakeArticleRepository(
+            articles = listOf(sampleArticleCard(id = "a1", title = "المقال الأول")),
+        )
+        articleRepository.detailArticle = sampleArticle(slug = "sample-a1", title = "تفاصيل المقال")
+        val authRepository = FakeAuthRepository.authenticated()
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                AppNavHost(
+                    repository = articleRepository,
+                    authRepository = authRepository,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("article_card_sample-a1").performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("تفاصيل المقال")[0].assertIsDisplayed()
+
+        authRepository.forceUnauthenticated()
+        composeRule.waitForIdle()
+
+        composeRule.onAllNodesWithText("تفاصيل المقال")[0].assertIsDisplayed()
+        composeRule.onNodeWithTag("article_bookmark").assertIsDisplayed()
     }
 }

@@ -1,5 +1,6 @@
 package com.techvisiondz.app.feature.home
 
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +41,7 @@ class HomeViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
         assertEquals(listOf(sampleArticleCard()), (state as UiState.Success).data.articles)
-        assertEquals("ar", repository.lastLanguageCode)
+        assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastLanguageCode)
     }
 
     @Test

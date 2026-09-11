@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.ui.UiState
@@ -22,7 +23,7 @@ import kotlinx.coroutines.launch
 class TagArticlesViewModel(
     private val repository: ArticleRepository,
     private val slug: String,
-    private val defaultLanguage: String = "ar",
+    private val defaultLanguage: String = AppConfig.DEFAULT_LANGUAGE_CODE,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<List<ArticleCard>>>(UiState.Loading)

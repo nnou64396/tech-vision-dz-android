@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.data.repository.SupabaseArticleRepository
@@ -28,7 +29,7 @@ import kotlinx.coroutines.launch
  */
 class SearchViewModel(
     private val repository: ArticleRepository,
-    private val defaultLanguage: String = "ar",
+    private val defaultLanguage: String = AppConfig.DEFAULT_LANGUAGE_CODE,
     private val debounceMillis: Long = 350L,
     private val minQueryLength: Int = 2,
 ) : ViewModel() {
