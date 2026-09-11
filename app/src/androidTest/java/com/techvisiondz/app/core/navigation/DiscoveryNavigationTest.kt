@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.techvisiondz.app.R
+import com.techvisiondz.app.core.data.repository.FakeAuthRepository
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
 import com.techvisiondz.app.feature.home.sampleArticleCard
@@ -38,7 +39,7 @@ class DiscoveryNavigationTest {
         )
         repository.detailArticle = sampleArticle(slug = "sample-a1", title = "تفاصيل الفئة")
 
-        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository) } }
+        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository, authRepository = FakeAuthRepository.authenticated()) } }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.categories)).performClick()
@@ -71,7 +72,7 @@ class DiscoveryNavigationTest {
             authorArticles = mapOf("tech-vision-dz" to listOf(sampleArticleCard(id = "a2", title = "مقال المؤلف"))),
         )
 
-        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository) } }
+        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository, authRepository = FakeAuthRepository.authenticated()) } }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.authors)).performClick()
@@ -99,7 +100,7 @@ class DiscoveryNavigationTest {
             tagArticles = mapOf("ai" to listOf(sampleArticleCard(id = "a3", title = "مقال الوسم"))),
         )
 
-        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository) } }
+        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository, authRepository = FakeAuthRepository.authenticated()) } }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.tags)).performClick()

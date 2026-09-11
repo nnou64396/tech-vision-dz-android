@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextInput
 import com.techvisiondz.app.R
+import com.techvisiondz.app.core.data.repository.FakeAuthRepository
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
 import com.techvisiondz.app.feature.home.sampleArticleCard
@@ -35,7 +36,7 @@ class SearchNavigationTest {
         )
         repository.detailArticle = sampleArticle(slug = "sample-s1", title = "تفاصيل البحث")
 
-        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository) } }
+        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository, authRepository = FakeAuthRepository.authenticated()) } }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("search_entry").performClick()

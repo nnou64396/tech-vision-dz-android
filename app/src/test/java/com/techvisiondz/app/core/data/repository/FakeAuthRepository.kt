@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 
 /**
  * Deterministic [AuthRepository] for unit tests. No network or real Supabase
@@ -13,6 +14,9 @@ import kotlinx.coroutines.flow.update
  * [signOut] helpers exactly as a signed-out app behaves: the flow starts at
  * [AuthState.Loading], then settles to [AuthState.Unauthenticated]; tests can
  * move it to [AuthState.Authenticated].
+ *
+ * Sign-in/sign-up/reset calls record their arguments and can be configured to
+ * fail via [signInError] / [signUpError] / [resetPasswordError].
  */
 class FakeAuthRepository(
     initialUser: AuthenticatedUserInfo? = null,
@@ -32,6 +36,33 @@ class FakeAuthRepository(
 
     /** Whether the last sign-out threw a failure. */
     var signOutError: Exception? = null
+
+    /** Number of times [signInWithEmail] was called. */
+    var signInCalls: Int = 0
+        private set
+
+    /** When set, [signInWithEmail]/[signUpWithEmail]/[resetPassword] throw it. */
+    var signInError: Exception? = null
+    var signUpError: Exception? = null
+    var resetPasswordError: Exception? = null
+
+    /** Last arguments observed by the auth calls. */
+    var lastSignInEmail: String? = null
+        private set
+    var lastSignInPassword: String? = null
+        private set
+    var lastSignUpEmail: String? = null
+        private set
+    var lastSignUpPassword: String? = null
+        private set
+    var lastResetEmail: String? = null
+        private set
+
+    /** Whether the next [signUpWithEmail] activation should be counted as sent. */
+    var signUpCalls: Int = 0
+        private set
+    var resetPasswordCalls: Int = 0
+        private set
 
     /** Simulates the SDK settling without a session (initial Loading → Unauth). */
     fun completeInitializationNotAuthenticated() {
@@ -55,7 +86,38 @@ class FakeAuthRepository(
 
     override fun currentUserOrNull(): AuthenticatedUserInfo? = currentUser
 
+    override suspend fun signInWithEmail(email: String, password: String) {
+        delay(1)
+        signInCalls++
+        lastSignInEmail = email
+        lastSignInPassword = password
+        signInError?.let { throw it }
+        setSession(
+            sampleAuthenticatedUser(
+                id = "user-$signInCalls",
+                email = email,
+                displayName = null,
+            ),
+        )
+    }
+
+    override suspend fun signUpWithEmail(email: String, password: String) {
+        delay(1)
+        signUpCalls++
+        lastSignUpEmail = email
+        lastSignUpPassword = password
+        signUpError?.let { throw it }
+    }
+
+    override suspend fun resetPassword(email: String) {
+        delay(1)
+        resetPasswordCalls++
+        lastResetEmail = email
+        resetPasswordError?.let { throw it }
+    }
+
     override suspend fun signOut() {
+        delay(1)
         signOutCalls++
         signOutError?.let { throw it }
         currentUser = null

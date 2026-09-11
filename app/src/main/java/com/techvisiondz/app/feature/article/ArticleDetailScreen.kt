@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,10 +57,12 @@ import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
 import com.techvisiondz.app.core.ui.components.LoadingState
 import com.techvisiondz.app.core.ui.components.TechGradientButton
+import com.techvisiondz.app.core.ui.TechVisionIcons
 import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.core.ui.formatViewsCount
 import com.techvisiondz.app.core.util.htmlBodySpanned
 import com.techvisiondz.app.core.util.spannedToAnnotatedString
+import com.techvisiondz.app.feature.auth.AuthError
 import com.techvisiondz.app.ui.theme.TechVisionRadii
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
 import com.techvisiondz.app.ui.theme.brandGradient
@@ -74,6 +78,11 @@ import com.techvisiondz.app.ui.theme.brandGradient
  *
  * [onShareArticle] stays an optional callback so screens can test the action
  * deterministically; the production wiring launches the Android sharesheet.
+ *
+ * The save/bookmark action is only rendered for authenticated contexts:
+ * [isAuthenticated] gates the icon, and tapping bookmarks through the view
+ * model. When the user is not authenticated an [onRequireSignIn] tap routes to
+ * the sign-in flow (no pending action is stored).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,8 +90,11 @@ fun ArticleDetailScreen(
     viewModel: ArticleDetailViewModel,
     onBack: () -> Unit,
     onShareArticle: ((Article) -> Unit)? = null,
+    isAuthenticated: Boolean = false,
+    onRequireSignIn: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val saveState by viewModel.saveState.collectAsState()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -108,12 +120,26 @@ fun ArticleDetailScreen(
                     },
                     actions = {
                         val state = uiState
-                        if (state is UiState.Success && onShareArticle != null) {
-                            IconButton(onClick = { onShareArticle(state.data) }) {
-                                Icon(
-                                    imageVector = Icons.Filled.Share,
-                                    contentDescription = stringResource(R.string.share_article),
+                        if (state is UiState.Success) {
+                            if (isAuthenticated || onRequireSignIn != null) {
+                                BookmarkAction(
+                                    saveState = saveState,
+                                    onToggleSave = {
+                                        if (isAuthenticated) {
+                                            viewModel.toggleSave()
+                                        } else {
+                                            onRequireSignIn?.invoke()
+                                        }
+                                    },
                                 )
+                            }
+                            if (onShareArticle != null) {
+                                IconButton(onClick = { onShareArticle(state.data) }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Share,
+                                        contentDescription = stringResource(R.string.share_article),
+                                    )
+                                }
                             }
                         }
                     },
@@ -145,15 +171,50 @@ fun ArticleDetailScreen(
                     message = stringResource(R.string.article_not_found),
                 )
 
-                is UiState.Success -> ArticleDetailContent(article = state.data)
+                is UiState.Success -> ArticleDetailContent(
+                    article = state.data,
+                    saveError = saveState.error,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun BookmarkAction(
+    saveState: ArticleSaveUiState,
+    onToggleSave: () -> Unit,
+) {
+    IconButton(
+        onClick = onToggleSave,
+        enabled = !saveState.isSaving,
+        modifier = Modifier.testTag("article_bookmark"),
+    ) {
+        if (saveState.isSaving) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            Icon(
+                imageVector = if (saveState.saved) TechVisionIcons.Bookmark else TechVisionIcons.BookmarkBorder,
+                contentDescription = stringResource(
+                    if (saveState.saved) R.string.saved_article_remove else R.string.saved_article_save,
+                ),
+                tint = if (saveState.saved) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onBackground,
+            )
         }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ArticleDetailContent(article: Article) {
+private fun ArticleDetailContent(
+    article: Article,
+    saveError: AuthError?,
+) {
     val uriHandler = LocalUriHandler.current
     val placeholderColor = MaterialTheme.colorScheme.surfaceContainerHighest
 
@@ -165,6 +226,20 @@ private fun ArticleDetailContent(article: Article) {
             .padding(top = TechVisionSpacing.Md, bottom = TechVisionSpacing.Xl),
         verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
     ) {
+        if (saveError != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.errorContainer,
+            ) {
+                Text(
+                    text = stringResource(saveError.messageRes),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(TechVisionSpacing.Md),
+                )
+            }
+        }
         article.coverUrl?.let { coverUrl ->
             AsyncImage(
                 model = coverUrl,

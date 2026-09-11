@@ -1,15 +1,23 @@
 package com.techvisiondz.app.core.data.repository
 
 import com.techvisiondz.app.core.data.AuthenticatedUserInfo
+import com.techvisiondz.app.core.data.AuthException
 import com.techvisiondz.app.core.data.AuthState
 import com.techvisiondz.app.core.data.toDataException
 import com.techvisiondz.app.core.network.SupabaseClientProvider
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.exception.AuthErrorCode
+import io.github.jan.supabase.auth.exception.AuthRestException
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
+import io.github.jan.supabase.exceptions.HttpRequestException
+import io.github.jan.supabase.exceptions.RestException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.io.IOException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -19,12 +27,16 @@ import kotlinx.serialization.json.JsonPrimitive
  * Wraps the GoTrue [Auth] plugin:
  *  - the session status [Flow] is mapped to [AuthState] — Loading / Unauth / Auth / Error;
  *  - the current user identity is read from the SDK's current session;
+ *  - sign-in/sign-up/password recovery call GoTrue directly;
  *  - sign-out revokes and clears the session.
  *
  * Tokens and credentials are never exposed or logged: they remain owned by the
  * SDK and are attached to requests automatically. The session itself is
  * persisted by the SDK's default `SettingsSessionManager` (SharedPreferences on
  * Android) and reloaded on process restart, so no custom token storage exists.
+ *
+ * SDK failures are converted to [AuthException] so the UI maps them to
+ * localized messages instead of raw server errors.
  */
 class SupabaseAuthRepository(
     private val auth: Auth = SupabaseClientProvider.auth,
@@ -37,6 +49,30 @@ class SupabaseAuthRepository(
     override fun currentUserOrNull(): AuthenticatedUserInfo? =
         auth.currentUserOrNull()?.toAuthenticatedUserInfo()
 
+    override suspend fun signInWithEmail(email: String, password: String) {
+        runAuth {
+            auth.signInWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+        }
+    }
+
+    override suspend fun signUpWithEmail(email: String, password: String) {
+        runAuth {
+            auth.signUpWith(Email) {
+                this.email = email.trim()
+                this.password = password
+            }
+        }
+    }
+
+    override suspend fun resetPassword(email: String) {
+        runAuth {
+            auth.resetPasswordForEmail(email.trim())
+        }
+    }
+
     override suspend fun signOut() {
         try {
             auth.signOut()
@@ -45,6 +81,80 @@ class SupabaseAuthRepository(
         } catch (e: Exception) {
             throw e.toDataException()
         }
+    }
+}
+
+/** Runs an auth call, rethrowing cancellation and converting failures to [AuthException]. */
+private suspend fun runAuth(block: suspend () -> Unit) {
+    try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        throw e.toAuthException()
+    }
+}
+
+/**
+ * Maps a raw Supabase/Ktor auth failure into an [AuthException].
+ *
+ * `internal` and deliberately independent of the SDK response objects where
+ * possible: the classification of an [AuthErrorCode] + HTTP status is a pure
+ * decision so the contract can be unit-tested with synthetic inputs.
+ */
+internal fun Throwable.toAuthException(): AuthException {
+    if (this is CancellationException) throw this
+    val rest = this as? RestException
+    val errorCode = (this as? AuthRestException)?.errorCode
+    if (rest != null) {
+        return mapAuthFailure(errorCode, rest.statusCode)
+    }
+    return when (this) {
+        is HttpRequestTimeoutException, is HttpRequestException, is IOException ->
+            AuthException.Network(this)
+        else -> AuthException.Unknown(this)
+    }
+}
+
+/**
+ * Classifies a GoTrue [AuthErrorCode] (+ HTTP status) into an [AuthException].
+ * `internal` and pure so synthetic codes/statuses are unit-testable.
+ */
+internal fun mapAuthFailure(errorCode: AuthErrorCode?, statusCode: Int?): AuthException {
+    val classified = when (errorCode) {
+        AuthErrorCode.InvalidCredentials,
+        AuthErrorCode.UserNotFound,
+        AuthErrorCode.EmailAddressNotAuthorized,
+        -> AuthException.InvalidCredentials()
+
+        AuthErrorCode.EmailNotConfirmed -> AuthException.EmailNotConfirmed()
+
+        AuthErrorCode.EmailExists,
+        AuthErrorCode.UserAlreadyExists,
+        -> AuthException.EmailAlreadyRegistered()
+
+        AuthErrorCode.WeakPassword -> AuthException.WeakPassword()
+
+        AuthErrorCode.OverRequestRateLimit,
+        AuthErrorCode.OverEmailSendRateLimit,
+        AuthErrorCode.OverSmsSendRateLimit,
+        -> AuthException.RateLimited()
+
+        AuthErrorCode.ValidationFailed,
+        AuthErrorCode.EmailAddressInvalid,
+        -> AuthException.InvalidEmail()
+
+        null -> null
+        else -> null
+    }
+    if (classified != null) return classified
+
+    return when (statusCode) {
+        400 -> AuthException.InvalidEmail()
+        401, 403, 404 -> AuthException.InvalidCredentials()
+        429 -> AuthException.RateLimited()
+        500, 502, 503, 504 -> AuthException.Server()
+        else -> AuthException.Unknown()
     }
 }
 

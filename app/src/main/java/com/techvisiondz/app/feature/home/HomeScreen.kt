@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -57,6 +58,7 @@ fun HomeScreen(
     onCategoriesClick: () -> Unit = {},
     onAuthorsClick: () -> Unit = {},
     onTagsClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -70,6 +72,7 @@ fun HomeScreen(
                 onCategoriesClick = onCategoriesClick,
                 onAuthorsClick = onAuthorsClick,
                 onTagsClick = onTagsClick,
+                onAccountClick = onAccountClick,
             )
             Box(modifier = Modifier.fillMaxSize()) {
                 when (val state = uiState) {
@@ -110,6 +113,7 @@ private fun HomeHeader(
     onCategoriesClick: () -> Unit,
     onAuthorsClick: () -> Unit,
     onTagsClick: () -> Unit,
+    onAccountClick: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -126,7 +130,7 @@ private fun HomeHeader(
         ) {
             BrandMark(size = 36.dp)
             Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge,
@@ -136,6 +140,16 @@ private fun HomeHeader(
                     text = stringResource(R.string.home_tagline),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(
+                onClick = onAccountClick,
+                modifier = Modifier.testTag("home_account"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = stringResource(R.string.account_title),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }

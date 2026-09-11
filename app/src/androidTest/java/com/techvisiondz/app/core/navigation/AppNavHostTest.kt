@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.techvisiondz.app.R
+import com.techvisiondz.app.core.data.repository.FakeAuthRepository
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
 import com.techvisiondz.app.feature.home.sampleArticleCard
@@ -35,7 +36,7 @@ class AppNavHostTest {
         )
         repository.detailArticle = sampleArticle(slug = "sample-a1", title = "عنوان المقال الكامل")
 
-        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository) } }
+        composeRule.setContent { TechVisionDzTheme { AppNavHost(repository = repository, authRepository = FakeAuthRepository.authenticated()) } }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("عنوان في القائمة").assertIsDisplayed()
