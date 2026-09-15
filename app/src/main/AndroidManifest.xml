@@ -5,6 +5,15 @@
          and load content images over the network. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Android 11+ (API 30+) package visibility: lets the app resolve the
+         system package installer for APK updates without broad visibility. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -26,6 +35,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Temporary in-app APK updater: exposes ONLY the dedicated internal
+             updater directory (see res/xml/file_paths.xml) to the system
+             package installer via a scoped content URI. Not exported, and no
+             broad filesystem access is granted. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

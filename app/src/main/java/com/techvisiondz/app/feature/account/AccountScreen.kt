@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.techvisiondz.app.BuildConfig
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.UserProfile
 import com.techvisiondz.app.core.ui.components.BackTopBarScreen
@@ -43,6 +44,9 @@ import com.techvisiondz.app.core.ui.components.LoadingState
 import com.techvisiondz.app.core.ui.TechVisionIcons
 import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.feature.auth.AuthError
+import com.techvisiondz.app.feature.update.UpdateCheckRow
+import com.techvisiondz.app.feature.update.UpdateUiState
+import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
 
 /**
@@ -55,10 +59,12 @@ import com.techvisiondz.app.ui.theme.TechVisionSpacing
 @Composable
 fun AccountScreen(
     viewModel: AccountViewModel,
+    updateViewModel: UpdateViewModel,
     onBack: () -> Unit,
     onSavedArticlesClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val updateState by updateViewModel.uiState.collectAsState()
 
     BackTopBarScreen(title = stringResource(R.string.account_title), onBack = onBack) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -72,6 +78,18 @@ fun AccountScreen(
                     signOutError = uiState.error,
                     onSignOut = viewModel::signOut,
                     onSavedArticlesClick = onSavedArticlesClick,
+                    updateState = updateState,
+                    onCheckForUpdates = { updateViewModel.checkForUpdate(manual = true) },
+                    onRetry = { updateViewModel.checkForUpdate(manual = true) },
+                    onUpdateAction = {
+                        when (updateState) {
+                            is UpdateUiState.UpdateAvailable -> updateViewModel.updateNow()
+                            UpdateUiState.ReadyToInstall,
+                            UpdateUiState.InstallationPermissionRequired ->
+                                updateViewModel.installUpdate()
+                            else -> Unit
+                        }
+                    },
                 )
 
                 else -> ErrorState(
@@ -90,6 +108,10 @@ private fun AccountContent(
     signOutError: AuthError?,
     onSignOut: () -> Unit,
     onSavedArticlesClick: () -> Unit,
+    updateState: UpdateUiState,
+    onCheckForUpdates: () -> Unit,
+    onRetry: () -> Unit,
+    onUpdateAction: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -141,6 +163,15 @@ private fun AccountContent(
         Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
         SavedArticlesRow(onClick = onSavedArticlesClick)
+
+        Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
+
+        UpdateStatusCard(
+            state = updateState,
+            onCheckForUpdate = onCheckForUpdates,
+            onRetry = onRetry,
+            onUpdate = onUpdateAction,
+        )
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -206,6 +237,47 @@ private fun SavedArticlesRow(onClick: () -> Unit) {
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Card hosting the reusable update check row plus the installed version label.
+ * Purely presentational: all events are forwarded to the parent/ViewModel.
+ */
+@Composable
+private fun UpdateStatusCard(
+    state: UpdateUiState,
+    onCheckForUpdate: () -> Unit,
+    onRetry: () -> Unit,
+    onUpdate: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("account_update_row"),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column {
+            UpdateCheckRow(
+                state = state,
+                onCheckForUpdate = onCheckForUpdate,
+                onRetry = onRetry,
+                onUpdate = onUpdate,
+                icon = TechVisionIcons.Update,
+            )
+            Text(
+                text = stringResource(R.string.update_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    start = TechVisionSpacing.Xl,
+                    end = TechVisionSpacing.Md,
+                    bottom = TechVisionSpacing.Md,
+                ),
             )
         }
     }

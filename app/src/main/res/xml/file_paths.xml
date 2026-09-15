@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   FileProvider paths for the temporary in-app APK updater.
+
+   Deliberately narrow: only the dedicated internal updater directory
+   (context.getCacheDir()/updater) is exposable to the system package
+   installer. No root, external storage, or arbitrary cache/files paths are
+   exposed. The path must stay in sync with UpdateStash.directory().
+-->
+<paths>
+    <cache-path
+        name="updater"
+        path="updater/" />
+</paths>

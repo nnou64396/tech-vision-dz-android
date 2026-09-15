@@ -35,8 +35,10 @@ android {
         applicationId = "com.techvisiondz.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode is the authoritative update ordering key. versionName is
+        // display-only and normalized to match the v1.0.0 GitHub release.
+        versionCode = 2
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -47,6 +49,17 @@ android {
         // Public article website base used to build canonical share URLs. Public,
         // not a secret — kept here to follow the same config architecture.
         buildConfigField("String", "ARTICLE_BASE_URL", "\"${secret("TECHVISION_ARTICLE_BASE_URL")}\"")
+        // Temporary pre-Google-Play in-app updater configuration. The manifest
+        // URL is a single pinned value (a stable GitHub Releases "latest" asset)
+        // so remote versions can never point the app at an arbitrary host.
+        // Flip UPDATER_ENABLED to false once the app is distributed via Google
+        // Play and the manual updater is retired.
+        buildConfigField(
+            "String",
+            "UPDATE_MANIFEST_URL",
+            "\"https://github.com/nnou64396/tech-vision-dz-android/releases/latest/download/update-manifest.json\"",
+        )
+        buildConfigField("boolean", "UPDATER_ENABLED", "true")
     }
 
     signingConfigs {

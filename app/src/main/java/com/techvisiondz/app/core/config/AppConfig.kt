@@ -28,6 +28,23 @@ object AppConfig {
     const val ARTICLE_BASE_URL: String = BuildConfig.ARTICLE_BASE_URL
 
     /**
+     * Pinned version manifest consumed by the temporary in-app updater.
+     *
+     * A single trusted value injected at build time; no other class hardcodes a
+     * different update URL. Points at the stable GitHub Releases "latest" asset
+     * so remote version change without a client rebuild.
+     */
+    const val UPDATE_MANIFEST_URL: String = BuildConfig.UPDATE_MANIFEST_URL
+
+    /**
+     * Master switch for the temporary pre-Google-Play updater. When the app is
+     * published through Google Play, flip this to false (via the build
+     * configuration) so the startup check is skipped and the manual update row
+     * is hidden instead of removed.
+     */
+    const val UPDATER_ENABLED: Boolean = BuildConfig.UPDATER_ENABLED
+
+    /**
      * Default language code for public content. Production source articles are
      * authored in Algerian Darija ('arq'); 'ar' is only an AI-produced target
      * translation, so every public query must default to 'arq' to match the

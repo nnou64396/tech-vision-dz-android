@@ -54,6 +54,7 @@ import com.techvisiondz.app.feature.tag.TagArticlesScreen
 import com.techvisiondz.app.feature.tag.TagArticlesViewModel
 import com.techvisiondz.app.feature.tag.TagListScreen
 import com.techvisiondz.app.feature.tag.TagViewModel
+import com.techvisiondz.app.feature.update.UpdateViewModel
 
 /**
  * Root navigation graph for the app.
@@ -80,12 +81,20 @@ fun AppNavHost(
     authRepository: AuthRepository = remember { SupabaseAuthRepository() },
     profileRepository: ProfileRepository = remember { SupabaseProfileRepository() },
     savedArticleRepository: SavedArticleRepository = remember { SupabaseSavedArticleRepository() },
+    updateViewModel: UpdateViewModel? = null,
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val shareArticleLabel = stringResource(R.string.share_article)
     val authState by authRepository.authState.collectAsState(initial = AuthState.Loading)
     val isAuthenticated = authState is AuthState.Authenticated
+
+    // An updater ViewModel passed from the app root is shared app-wide (single
+    // instance for both the startup dialog host and the Account row). When
+    // none is supplied (tests / standalone embedding), a session-scoped one is
+    // created here so the Account screen still works.
+    val effectiveUpdateViewModel = updateViewModel
+        ?: viewModel(factory = UpdateViewModel.Factory)
 
     NavHost(
         navController = navController,
@@ -137,6 +146,7 @@ fun AppNavHost(
                 onBack = { navController.popBackStack() },
                 onSavedArticlesClick = { navController.navigate(Routes.SavedArticles) },
                 viewModel = viewModel(factory = AccountViewModel.factory(authRepository, profileRepository)),
+                updateViewModel = effectiveUpdateViewModel,
             )
         }
         composable<Routes.SavedArticles> {
