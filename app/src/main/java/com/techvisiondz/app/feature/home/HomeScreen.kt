@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -67,6 +68,7 @@ fun HomeScreen(
     onAuthorsClick: () -> Unit = {},
     onTagsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -96,6 +98,7 @@ fun HomeScreen(
                 onAuthorsClick = onAuthorsClick,
                 onTagsClick = onTagsClick,
                 onAccountClick = onAccountClick,
+                onSettingsClick = onSettingsClick,
             )
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
@@ -148,6 +151,7 @@ private fun HomeHeader(
     onAuthorsClick: () -> Unit,
     onTagsClick: () -> Unit,
     onAccountClick: () -> Unit,
+    onSettingsClick: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -174,6 +178,16 @@ private fun HomeHeader(
                     text = stringResource(R.string.home_tagline),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.testTag("home_settings"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = stringResource(R.string.settings),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
             IconButton(

@@ -10,9 +10,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.repository.FakeAuthRepository
+import com.techvisiondz.app.core.settings.AppLanguage
+import com.techvisiondz.app.core.settings.FakeSettingsPreferences
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
 import com.techvisiondz.app.feature.home.sampleArticleCard
+import com.techvisiondz.app.feature.settings.SettingsViewModel
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -51,5 +54,36 @@ class AppNavHostTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("عنوان في القائمة").assertIsDisplayed()
+    }
+
+    @Test
+    fun homeSettingsIconNavigatesToSettingsAndBackReturnsHome() {
+        composeRule.setContent {
+            TechVisionDzTheme {
+                AppNavHost(
+                    repository = FakeArticleRepository(articles = emptyList()),
+                    authRepository = FakeAuthRepository.authenticated(),
+                    settingsViewModel = SettingsViewModel(
+                        FakeSettingsPreferences(),
+                    ) { AppLanguage.ENGLISH },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_settings").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(
+            composeRule.activity.getString(R.string.settings_appearance),
+        ).assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription(composeRule.activity.getString(R.string.back))
+            .performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_settings").assertIsDisplayed()
     }
 }

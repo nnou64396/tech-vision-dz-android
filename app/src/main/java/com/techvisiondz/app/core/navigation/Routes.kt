@@ -50,4 +50,7 @@ object Routes {
 
     @Serializable
     data object SavedArticles
+
+    @Serializable
+    data object Settings
 }

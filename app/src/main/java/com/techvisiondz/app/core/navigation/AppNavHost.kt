@@ -50,6 +50,8 @@ import com.techvisiondz.app.feature.saved.SavedArticlesScreen
 import com.techvisiondz.app.feature.saved.SavedArticlesViewModel
 import com.techvisiondz.app.feature.search.SearchScreen
 import com.techvisiondz.app.feature.search.SearchViewModel
+import com.techvisiondz.app.feature.settings.SettingsScreen
+import com.techvisiondz.app.feature.settings.SettingsViewModel
 import com.techvisiondz.app.feature.tag.TagArticlesScreen
 import com.techvisiondz.app.feature.tag.TagArticlesViewModel
 import com.techvisiondz.app.feature.tag.TagListScreen
@@ -82,6 +84,7 @@ fun AppNavHost(
     profileRepository: ProfileRepository = remember { SupabaseProfileRepository() },
     savedArticleRepository: SavedArticleRepository = remember { SupabaseSavedArticleRepository() },
     updateViewModel: UpdateViewModel? = null,
+    settingsViewModel: SettingsViewModel? = null,
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -107,6 +110,14 @@ fun AppNavHost(
     // created here so the Account screen still works.
     val effectiveUpdateViewModel = updateViewModel
         ?: viewModel(factory = UpdateViewModel.Factory)
+
+    // Like the update ViewModel, a Settings ViewModel passed from the app root
+    // is shared app-wide (single source of truth for the theme + locale the
+    // root derives from it). When none is supplied (tests / standalone
+    // embedding), a session-scoped one backed by the real preferences is
+    // created here so the Settings screen still works.
+    val effectiveSettingsViewModel = settingsViewModel
+        ?: viewModel(factory = SettingsViewModel.Factory)
 
     NavHost(
         navController = navController,
@@ -150,6 +161,7 @@ fun AppNavHost(
                             ?.set(AUTH_RETURN_KEY, AUTH_RETURN_ACCOUNT)
                     }
                 },
+                onSettingsClick = { navController.navigate(Routes.Settings) },
                 viewModel = viewModel(factory = HomeViewModel.factory(repository)),
             )
         }
@@ -157,7 +169,15 @@ fun AppNavHost(
             AccountScreen(
                 onBack = { navController.popBackStack() },
                 onSavedArticlesClick = { navController.navigate(Routes.SavedArticles) },
+                onSettingsClick = { navController.navigate(Routes.Settings) },
                 viewModel = viewModel(factory = AccountViewModel.factory(authRepository, profileRepository)),
+                updateViewModel = effectiveUpdateViewModel,
+            )
+        }
+        composable<Routes.Settings> {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = effectiveSettingsViewModel,
                 updateViewModel = effectiveUpdateViewModel,
             )
         }

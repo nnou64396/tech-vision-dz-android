@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +36,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.techvisiondz.app.BuildConfig
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.UserProfile
 import com.techvisiondz.app.core.ui.components.BackTopBarScreen
@@ -44,7 +44,7 @@ import com.techvisiondz.app.core.ui.components.LoadingState
 import com.techvisiondz.app.core.ui.TechVisionIcons
 import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.feature.auth.AuthError
-import com.techvisiondz.app.feature.update.UpdateCheckRow
+import com.techvisiondz.app.feature.update.UpdateStatusCard
 import com.techvisiondz.app.feature.update.UpdateUiState
 import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
@@ -62,6 +62,7 @@ fun AccountScreen(
     updateViewModel: UpdateViewModel,
     onBack: () -> Unit,
     onSavedArticlesClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val updateState by updateViewModel.uiState.collectAsState()
@@ -78,6 +79,7 @@ fun AccountScreen(
                     signOutError = uiState.error,
                     onSignOut = viewModel::signOut,
                     onSavedArticlesClick = onSavedArticlesClick,
+                    onSettingsClick = onSettingsClick,
                     updateState = updateState,
                     onCheckForUpdates = { updateViewModel.checkForUpdate(manual = true) },
                     onRetry = { updateViewModel.checkForUpdate(manual = true) },
@@ -108,6 +110,7 @@ private fun AccountContent(
     signOutError: AuthError?,
     onSignOut: () -> Unit,
     onSavedArticlesClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     updateState: UpdateUiState,
     onCheckForUpdates: () -> Unit,
     onRetry: () -> Unit,
@@ -166,11 +169,16 @@ private fun AccountContent(
 
         Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
 
+        SettingsRow(onClick = onSettingsClick)
+
+        Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
+
         UpdateStatusCard(
             state = updateState,
             onCheckForUpdate = onCheckForUpdates,
             onRetry = onRetry,
             onUpdate = onUpdateAction,
+            testTag = "account_update_row",
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -242,48 +250,52 @@ private fun SavedArticlesRow(onClick: () -> Unit) {
     }
 }
 
-/**
- * Card hosting the reusable update check row plus the installed version label.
- * Purely presentational: all events are forwarded to the parent/ViewModel.
- */
+/** Navigation row opening the Settings screen. */
 @Composable
-private fun UpdateStatusCard(
-    state: UpdateUiState,
-    onCheckForUpdate: () -> Unit,
-    onRetry: () -> Unit,
-    onUpdate: () -> Unit,
-) {
+private fun SettingsRow(onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("account_update_row"),
+            .testTag("account_settings"),
+        onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Column {
-            UpdateCheckRow(
-                state = state,
-                onCheckForUpdate = onCheckForUpdate,
-                onRetry = onRetry,
-                onUpdate = onUpdate,
-                icon = TechVisionIcons.Update,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = TechVisionSpacing.Md,
+                    vertical = TechVisionSpacing.Md,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(TechVisionSpacing.Md),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = stringResource(R.string.update_version, BuildConfig.VERSION_NAME),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(
-                    start = TechVisionSpacing.Xl,
-                    end = TechVisionSpacing.Md,
-                    bottom = TechVisionSpacing.Md,
-                ),
+                text = stringResource(R.string.settings),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
 
-/** The user's avatar, or a branded person fallback when not provided. */
+/**
+ * The user's avatar, or a branded person fallback when not provided.
+ */
 @Composable
 private fun Avatar(
     avatarUrl: String?,

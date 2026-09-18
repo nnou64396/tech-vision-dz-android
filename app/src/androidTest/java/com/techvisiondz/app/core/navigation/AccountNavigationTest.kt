@@ -11,7 +11,10 @@ import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.repository.FakeAuthRepository
 import com.techvisiondz.app.core.data.repository.FakeProfileRepository
 import com.techvisiondz.app.core.data.repository.sampleUserProfile
+import com.techvisiondz.app.core.settings.AppLanguage
+import com.techvisiondz.app.core.settings.FakeSettingsPreferences
 import com.techvisiondz.app.feature.home.FakeArticleRepository
+import com.techvisiondz.app.feature.settings.SettingsViewModel
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -110,5 +113,34 @@ class AccountNavigationTest {
 
         composeRule.onNodeWithTag("home_account").assertIsDisplayed()
         composeRule.onNodeWithTag("sign_in_email").assertDoesNotExist()
+    }
+
+    @Test
+    fun settingsRowOnAccountOpensSettingsScreen() {
+        composeRule.setContent {
+            TechVisionDzTheme {
+                AppNavHost(
+                    repository = FakeArticleRepository(articles = emptyList()),
+                    authRepository = FakeAuthRepository.authenticated(),
+                    profileRepository = FakeProfileRepository(),
+                    settingsViewModel = SettingsViewModel(
+                        FakeSettingsPreferences(),
+                    ) { AppLanguage.ENGLISH },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("home_account").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("account_settings").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(
+            composeRule.activity.getString(R.string.settings_language),
+        ).assertIsDisplayed()
     }
 }
