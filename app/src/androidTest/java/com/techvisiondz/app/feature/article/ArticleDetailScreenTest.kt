@@ -5,11 +5,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.data.model.Article
+import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.formatViewsCount
 import com.techvisiondz.app.feature.home.FakeArticleRepository
@@ -168,5 +171,160 @@ class ArticleDetailScreenTest {
 
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_video)).assertIsDisplayed()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_video_watch)).assertIsDisplayed()
+    }
+
+    @Test
+    fun softwareCardShowsNameVersionAndDownloadButton() {
+        val article = sampleArticle(
+            title = "Article with software",
+            body = null,
+            software = SoftwareSummary(
+                name = "تطبيق TECH VISION DZ",
+                version = "2.4.0",
+                downloadUrl = "https://example.com/app-release.apk",
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_software, "تطبيق TECH VISION DZ"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.software_version, "2.4.0"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("software_download").assertIsDisplayed()
+    }
+
+    @Test
+    fun softwareCardRendersNameWithoutVersionWhenVersionMissing() {
+        val article = sampleArticle(
+            title = "Article with software",
+            body = null,
+            software = SoftwareSummary(name = "نطاق بدون إصدار", version = null, downloadUrl = "https://example.com/a"),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_software, "نطاق بدون إصدار"))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.software_version, "x")).assertDoesNotExist()
+    }
+
+    @Test
+    fun softwareDownloadClickInvokesHandlerWithValidatedUrl() {
+        var openedUrl: String? = null
+        val article = sampleArticle(
+            title = "Article with software",
+            body = null,
+            software = SoftwareSummary(
+                name = "App",
+                version = null,
+                downloadUrl = "   https://example.com/download/app-release.apk   ",
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                ArticleDetailScreen(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onDownloadClick = { openedUrl = it },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("software_download").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("https://example.com/download/app-release.apk", openedUrl)
+    }
+
+    @Test
+    fun softwareCardShowsUnavailableWhenDownloadUrlMissing() {
+        val article = sampleArticle(
+            title = "Article without a link",
+            body = null,
+            software = SoftwareSummary(name = "App", version = "1.0.0", downloadUrl = null),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.software_unavailable))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("software_download").assertDoesNotExist()
+    }
+
+    @Test
+    fun softwareCardShowsUnavailableForUnsupportedScheme() {
+        val article = sampleArticle(
+            title = "Article with a bad link",
+            body = null,
+            software = SoftwareSummary(name = "App", version = null, downloadUrl = "javascript:alert(1)"),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.software_unavailable))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("software_download").assertDoesNotExist()
+    }
+
+    @Test
+    fun softwareCardShowsUnavailableForBlankUrlWhitespace() {
+        val article = sampleArticle(
+            title = "Article with a whitespace link",
+            body = null,
+            software = SoftwareSummary(name = "App", version = null, downloadUrl = "   "),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.software_unavailable))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag("software_download").assertDoesNotExist()
     }
 }

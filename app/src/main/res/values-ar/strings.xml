@@ -10,6 +10,10 @@
     <string name="article_not_found">المقال غير موجود</string>
     <string name="article_error">تعذر تحميل المقال</string>
     <string name="article_software">البرمجيات: %1$s</string>
+    <string name="software_version">الإصدار: %1$s</string>
+    <string name="software_opens_external">يُفتح التنزيل في متصفحك</string>
+    <string name="software_unavailable">التنزيل غير متاح</string>
+    <string name="software_download_error">تعذر فتح التنزيل. تحقق من المتصفح وحاول مرة أخرى</string>
     <string name="article_views">%1$s مشاهدة</string>
     <string name="share_article">مشاركة المقال</string>
     <plurals name="reading_time_minutes">

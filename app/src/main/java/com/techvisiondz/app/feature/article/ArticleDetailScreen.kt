@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -35,6 +37,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +56,7 @@ import coil3.compose.AsyncImage
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard as ArticleCardModel
+import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.core.ui.components.ArticleCard
@@ -64,12 +69,14 @@ import com.techvisiondz.app.core.ui.components.TechGradientButton
 import com.techvisiondz.app.core.ui.TechVisionIcons
 import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.core.ui.formatViewsCount
+import com.techvisiondz.app.core.util.DownloadUrlPolicy
 import com.techvisiondz.app.core.util.htmlBodySpanned
 import com.techvisiondz.app.core.util.spannedToAnnotatedString
 import com.techvisiondz.app.feature.auth.AuthError
 import com.techvisiondz.app.ui.theme.TechVisionRadii
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
 import com.techvisiondz.app.ui.theme.brandGradient
+import kotlinx.coroutines.launch
 
 /**
  * Article details screen — the app's premium editorial surface.
@@ -87,6 +94,12 @@ import com.techvisiondz.app.ui.theme.brandGradient
  * [isAuthenticated] gates the icon, and tapping bookmarks through the view
  * model. When the user is not authenticated an [onRequireSignIn] tap routes to
  * the sign-in flow (no pending action is stored).
+ *
+ * The software download card validates its link as `http`/`https` before
+ * opening it externally; a failed launch surfaces a snackbar instead of
+ * crashing. [onDownloadClick] is an optional callback so tests can verify the
+ * validated URL deterministically; when null the production wiring opens the
+ * system browser and guards failures.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,14 +110,20 @@ fun ArticleDetailScreen(
     onRelatedArticleClick: ((String) -> Unit)? = null,
     isAuthenticated: Boolean = false,
     onRequireSignIn: (() -> Unit)? = null,
+    onDownloadClick: ((String) -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     val relatedState by viewModel.relatedArticles.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val downloadFailureMessage = stringResource(R.string.software_download_error)
+    val openDownload = onDownloadClick
+        ?: rememberDownloadLauncher(snackbarHostState = snackbarHostState, failureMessage = downloadFailureMessage)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -182,6 +201,7 @@ fun ArticleDetailScreen(
                     saveError = saveState.error,
                     relatedState = relatedState,
                     onRelatedArticleClick = onRelatedArticleClick ?: {},
+                    onOpenDownload = openDownload,
                 )
             }
         }
@@ -275,6 +295,29 @@ private fun isSafeVideoUrl(url: String): Boolean {
     return clean.startsWith("https://") || clean.startsWith("http://")
 }
 
+/**
+ * Opens a pre-validated `http(s)` URL in the system browser, guarding against
+ * launch failures (for example when no browser is available) so the screen
+ * never crashes. A failed launch surfaces a localized snackbar; the user can
+ * simply tap the download action again to retry.
+ */
+@Composable
+private fun rememberDownloadLauncher(
+    snackbarHostState: SnackbarHostState,
+    failureMessage: String,
+): (String) -> Unit {
+    val uriHandler = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
+    return remember(snackbarHostState, failureMessage, uriHandler, scope) {
+        { url ->
+            val opened = runCatching { uriHandler.openUri(url) }.isSuccess
+            if (!opened) {
+                scope.launch { snackbarHostState.showSnackbar(failureMessage) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun BookmarkAction(
     saveState: ArticleSaveUiState,
@@ -304,6 +347,77 @@ private fun BookmarkAction(
     }
 }
 
+@Composable
+private fun SoftwareDownloadCard(
+    software: SoftwareSummary,
+    onOpenDownload: (String) -> Unit,
+) {
+    val name = software.name.trim()
+    if (name.isEmpty()) return
+    val downloadUrl = DownloadUrlPolicy.normalize(software.downloadUrl)
+
+    Surface(
+        shape = RoundedCornerShape(TechVisionRadii.Lg),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(TechVisionSpacing.Lg),
+            verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 4.dp, height = 40.dp)
+                        .clip(RoundedCornerShape(TechVisionRadii.Sm))
+                        .background(brush = MaterialTheme.colorScheme.brandGradient()),
+                )
+                Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(R.string.article_software, name),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    software.version?.takeIf { it.isNotBlank() }?.let { version ->
+                        Text(
+                            text = stringResource(R.string.software_version, version.trim()),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            // External downloads are the only supported flow: the link is
+            // validated as http(s) before it is handed to the system browser.
+            // The backend does not expose whether a download requires
+            // authentication, so the card never presents an auth prompt — the
+            // download behaves exactly like reading the article (public).
+            if (downloadUrl != null) {
+                TechGradientButton(
+                    text = stringResource(R.string.download),
+                    onClick = { onOpenDownload(downloadUrl) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("software_download"),
+                )
+                Text(
+                    text = stringResource(R.string.software_opens_external),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.software_unavailable),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ArticleDetailContent(
@@ -311,6 +425,7 @@ private fun ArticleDetailContent(
     saveError: AuthError?,
     relatedState: UiState<List<ArticleCardModel>>,
     onRelatedArticleClick: (String) -> Unit,
+    onOpenDownload: (String) -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
     val placeholderColor = MaterialTheme.colorScheme.surfaceContainerHighest
@@ -457,45 +572,8 @@ private fun ArticleDetailContent(
         )
 
         article.software?.let { software ->
-            val softwareText = buildString {
-                append(software.name)
-                software.version?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
-            }
-            if (softwareText.isNotBlank()) {
-                Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
-                Surface(
-                    shape = RoundedCornerShape(TechVisionRadii.Lg),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(TechVisionSpacing.Lg),
-                        verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Md),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(width = 4.dp, height = 40.dp)
-                                    .clip(RoundedCornerShape(TechVisionRadii.Sm))
-                                    .background(brush = MaterialTheme.colorScheme.brandGradient()),
-                            )
-                            Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
-                            Text(
-                                text = stringResource(R.string.article_software, softwareText),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                        software.downloadUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                            TechGradientButton(
-                                text = stringResource(R.string.download),
-                                onClick = { uriHandler.openUri(url) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+            SoftwareDownloadCard(software = software, onOpenDownload = onOpenDownload)
         }
     }
 }

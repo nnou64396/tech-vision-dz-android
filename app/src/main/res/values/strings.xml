@@ -9,6 +9,10 @@
     <string name="article_not_found">Article not found</string>
     <string name="article_error">Could not load the article</string>
     <string name="article_software">Software: %1$s</string>
+    <string name="software_version">Version: %1$s</string>
+    <string name="software_opens_external">The download opens in your browser</string>
+    <string name="software_unavailable">Download unavailable</string>
+    <string name="software_download_error">Could not open the download. Check your browser and try again</string>
     <string name="article_views">%1$s views</string>
     <string name="article_video">Video</string>
     <string name="article_video_watch">Watch video</string>

@@ -6,6 +6,7 @@ import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.data.model.AuthorSummary
 import com.techvisiondz.app.core.data.model.Category
 import com.techvisiondz.app.core.data.model.CategorySummary
+import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagSummary
 import com.techvisiondz.app.core.data.model.VideoRef
@@ -176,6 +177,7 @@ fun sampleArticle(
     tags: List<TagSummary> = listOf(TagSummary(slug = "ai", label = "AI")),
     coverUrl: String? = null,
     video: VideoRef? = null,
+    software: SoftwareSummary? = null,
 ) = Article(
     id = "article-$slug",
     slug = slug,
@@ -192,5 +194,5 @@ fun sampleArticle(
     coverUrl = coverUrl,
     coverAlt = null,
     video = video,
-    software = null,
+    software = software,
 )
