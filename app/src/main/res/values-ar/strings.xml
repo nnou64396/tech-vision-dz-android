@@ -15,6 +15,11 @@
     <string name="software_unavailable">التنزيل غير متاح</string>
     <string name="software_download_error">تعذر فتح التنزيل. تحقق من المتصفح وحاول مرة أخرى</string>
     <string name="article_views">%1$s مشاهدة</string>
+    <string name="article_video">فيديو</string>
+    <string name="article_video_watch">مشاهدة الفيديو</string>
+    <string name="article_video_error">تعذر فتح الفيديو. تحقق من المتصفح وحاول مرة أخرى</string>
+    <string name="related_articles_title">المزيد من TECH VISION DZ</string>
+    <string name="related_articles_error">تعذر تحميل المقالات ذات الصلة</string>
     <string name="share_article">مشاركة المقال</string>
     <plurals name="reading_time_minutes">
         <item quantity="zero">٠ دقائق للقراءة</item>

@@ -19,6 +19,12 @@ interface UpdatePreferences {
     /** Records that the update prompt was deferred at [timestampMillis]. */
     fun markDeferred(timestampMillis: Long)
 
+    /** The start of the last automatic check, as epoch millis, or null. */
+    fun lastAutomaticCheckAtMillis(): Long?
+
+    /** Records that an automatic check ran at [timestampMillis]. */
+    fun markAutomaticCheck(timestampMillis: Long)
+
     fun clear()
 }
 
@@ -42,11 +48,22 @@ class SharedPrefsUpdatePreferences(context: Context) : UpdatePreferences {
         prefs.edit { putLong(KEY_DEFERRED_AT, timestampMillis) }
     }
 
+    override fun lastAutomaticCheckAtMillis(): Long? =
+        prefs.getLong(KEY_LAST_AUTO_CHECK_AT, -1L).takeIf { it >= 0 }
+
+    override fun markAutomaticCheck(timestampMillis: Long) {
+        prefs.edit { putLong(KEY_LAST_AUTO_CHECK_AT, timestampMillis) }
+    }
+
     override fun clear() {
-        prefs.edit { remove(KEY_DEFERRED_AT) }
+        prefs.edit {
+            remove(KEY_DEFERRED_AT)
+            remove(KEY_LAST_AUTO_CHECK_AT)
+        }
     }
 
     private companion object {
         const val KEY_DEFERRED_AT = "deferred_at_epoch_millis"
+        const val KEY_LAST_AUTO_CHECK_AT = "last_automatic_check_at_epoch_millis"
     }
 }

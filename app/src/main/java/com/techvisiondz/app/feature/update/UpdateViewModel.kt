@@ -65,6 +65,10 @@ class UpdateViewModel(
     private val preferences: UpdatePreferences,
     private val application: Application,
     private val deferralCooldownMillis: Long = DEFAULT_DEFERRAL_COOLDOWN_MILLIS,
+    // Automatic checks are additionally throttled to at most one per
+    // automaticCheckCooldownMillis, so a fresh launch does not hammer the update
+    // channel. Manual checks always run and reset the throttle.
+    private val automaticCheckCooldownMillis: Long = DEFAULT_AUTOMATIC_CHECK_COOLDOWN_MILLIS,
     // Test seam: lets JVM tests stage and clean up the APK without an Android
     // Context. Defaults keep production behavior on UpdateStash (cacheDir/updater).
     private val stagedApkProvider: () -> File = { UpdateStash.apk(application) },
@@ -84,7 +88,7 @@ class UpdateViewModel(
      */
     fun checkForUpdate(manual: Boolean = false) {
         if (checkInProgress || downloadJob?.isActive == true) return
-        if (!manual && isWithinDeferralCooldown()) return
+        if (!manual && (isWithinDeferralCooldown() || isWithinAutomaticCheckCooldown())) return
 
         checkInProgress = true
         _uiState.value = UpdateUiState.Checking
@@ -115,6 +119,7 @@ class UpdateViewModel(
                 _uiState.value = UpdateUiState.Idle
             } finally {
                 checkInProgress = false
+                if (!manual) preferences.markAutomaticCheck(System.currentTimeMillis())
             }
         }
     }
@@ -256,6 +261,11 @@ class UpdateViewModel(
         return System.currentTimeMillis() - lastDeferred < deferralCooldownMillis
     }
 
+    private fun isWithinAutomaticCheckCooldown(): Boolean {
+        val lastAutomaticCheck = preferences.lastAutomaticCheckAtMillis() ?: return false
+        return System.currentTimeMillis() - lastAutomaticCheck < automaticCheckCooldownMillis
+    }
+
     private fun updateErrorMessageRes(error: UpdateError): Int = when (error) {
         UpdateError.Disabled -> R.string.update_error_disabled
         UpdateError.Network,
@@ -276,6 +286,9 @@ class UpdateViewModel(
     companion object {
         /** Default window during which automatic checks respect a "Later" choice. */
         const val DEFAULT_DEFERRAL_COOLDOWN_MILLIS = 24L * 60 * 60 * 1000
+
+        /** Default throttle between automatic (non-manual) update checks. */
+        const val DEFAULT_AUTOMATIC_CHECK_COOLDOWN_MILLIS = 24L * 60 * 60 * 1000
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

@@ -75,15 +75,23 @@ class UpdateViewModelTest {
 
     private class FakeUpdatePreferences : UpdatePreferences {
         private var deferredAt: Long? = null
+        private var automaticCheckAt: Long? = null
         var markCount = 0
         var clearCount = 0
+        var automaticMarkCount = 0
         override fun lastDeferredAtMillis(): Long? = deferredAt
         override fun markDeferred(timestampMillis: Long) {
             deferredAt = timestampMillis
             markCount++
         }
+        override fun lastAutomaticCheckAtMillis(): Long? = automaticCheckAt
+        override fun markAutomaticCheck(timestampMillis: Long) {
+            automaticCheckAt = timestampMillis
+            automaticMarkCount++
+        }
         override fun clear() {
             deferredAt = null
+            automaticCheckAt = null
             clearCount++
         }
     }
@@ -222,6 +230,48 @@ class UpdateViewModelTest {
 
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value is UpdateUiState.UpdateAvailable)
+        assertEquals(1, fetcher.fetchCount)
+    }
+
+    @Test
+    fun `automatic check is skipped during the automatic check cooldown`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val preferences = FakeUpdatePreferences().apply {
+            markAutomaticCheck(System.currentTimeMillis())
+        }
+        val viewModel = viewModel(fetcher, preferences = preferences)
+
+        viewModel.checkForUpdate()
+        runCurrent()
+
+        assertEquals(UpdateUiState.Idle, viewModel.uiState.value)
+        assertEquals(0, fetcher.fetchCount)
+    }
+
+    @Test
+    fun `automatic check records the timestamp when it runs`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val preferences = FakeUpdatePreferences()
+        val viewModel = viewModel(fetcher, preferences = preferences)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+
+        assertEquals(1, preferences.automaticMarkCount)
+        assertTrue(preferences.lastAutomaticCheckAtMillis() != null)
+    }
+
+    @Test
+    fun `manual check bypasses the automatic check cooldown`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val preferences = FakeUpdatePreferences().apply {
+            markAutomaticCheck(System.currentTimeMillis())
+        }
+        val viewModel = viewModel(fetcher, preferences = preferences)
+
+        viewModel.checkForUpdate(manual = true)
+        advanceUntilIdle()
+
         assertEquals(1, fetcher.fetchCount)
     }
 

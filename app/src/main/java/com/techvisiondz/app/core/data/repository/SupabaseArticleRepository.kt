@@ -51,7 +51,14 @@ class SupabaseArticleRepository(
             .select(Columns.raw(HOME_FEED_SELECT)) {
                 filter { eq("status", "published") }
                 filter { eq("article_translations.language_code", languageCode) }
+                // Order by publication time first, then break publication-time
+                // ties with the id so pagination is fully deterministic: the
+                // published_at DESC join is not unique, and without a secondary
+                // ordering PostgREST's row-number pagination can return the
+                // same article on two pages or skip one when several articles
+                // share an identical timestamp.
                 order("published_at", Order.DESCENDING, nullsFirst = true)
+                order("id", Order.DESCENDING, nullsFirst = false)
                 pagedRange(offset, limit)
             }
             .decodeList<ArticleFeedRow>()

@@ -16,6 +16,7 @@
     <string name="article_views">%1$s views</string>
     <string name="article_video">Video</string>
     <string name="article_video_watch">Watch video</string>
+    <string name="article_video_error">Could not open the video. Check your browser and try again</string>
     <string name="related_articles_title">More from TECH VISION DZ</string>
     <string name="related_articles_error">Could not load related articles</string>
     <string name="share_article">Share article</string>

@@ -95,6 +95,8 @@ class SettingsScreenTest {
         preferences = object : UpdatePreferences {
             override fun lastDeferredAtMillis(): Long? = null
             override fun markDeferred(timestampMillis: Long) = Unit
+            override fun lastAutomaticCheckAtMillis(): Long? = null
+            override fun markAutomaticCheck(timestampMillis: Long) = Unit
             override fun clear() = Unit
         },
         application = context.application as Application,

@@ -100,6 +100,11 @@ import kotlinx.coroutines.launch
  * crashing. [onDownloadClick] is an optional callback so tests can verify the
  * validated URL deterministically; when null the production wiring opens the
  * system browser and guards failures.
+ *
+ * The video watch action follows the same pattern: the URL is validated as
+ * `http`/`https`, the launch is guarded against an unhandled intent (which
+ * would otherwise crash the screen) and a failed launch surfaces a localized
+ * snackbar. [onOpenVideo] mirrors [onDownloadClick] as a test seam.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,14 +116,18 @@ fun ArticleDetailScreen(
     isAuthenticated: Boolean = false,
     onRequireSignIn: (() -> Unit)? = null,
     onDownloadClick: ((String) -> Unit)? = null,
+    onOpenVideo: ((String) -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     val relatedState by viewModel.relatedArticles.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val downloadFailureMessage = stringResource(R.string.software_download_error)
+    val videoFailureMessage = stringResource(R.string.article_video_error)
     val openDownload = onDownloadClick
-        ?: rememberDownloadLauncher(snackbarHostState = snackbarHostState, failureMessage = downloadFailureMessage)
+        ?: rememberExternalUrlLauncher(snackbarHostState = snackbarHostState, failureMessage = downloadFailureMessage)
+    val openVideo = onOpenVideo
+        ?: rememberExternalUrlLauncher(snackbarHostState = snackbarHostState, failureMessage = videoFailureMessage)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -202,6 +211,7 @@ fun ArticleDetailScreen(
                     relatedState = relatedState,
                     onRelatedArticleClick = onRelatedArticleClick ?: {},
                     onOpenDownload = openDownload,
+                    onOpenVideo = openVideo,
                 )
             }
         }
@@ -297,12 +307,13 @@ private fun isSafeVideoUrl(url: String): Boolean {
 
 /**
  * Opens a pre-validated `http(s)` URL in the system browser, guarding against
- * launch failures (for example when no browser is available) so the screen
- * never crashes. A failed launch surfaces a localized snackbar; the user can
- * simply tap the download action again to retry.
+ * launch failures (for example when no browser or app can handle the intent)
+ * so the screen never crashes. A failed launch surfaces a localized snackbar;
+ * the user can simply tap the action again to retry. Used for both the
+ * software download card and the article video watch action.
  */
 @Composable
-private fun rememberDownloadLauncher(
+private fun rememberExternalUrlLauncher(
     snackbarHostState: SnackbarHostState,
     failureMessage: String,
 ): (String) -> Unit {
@@ -426,8 +437,8 @@ private fun ArticleDetailContent(
     relatedState: UiState<List<ArticleCardModel>>,
     onRelatedArticleClick: (String) -> Unit,
     onOpenDownload: (String) -> Unit,
+    onOpenVideo: (String) -> Unit,
 ) {
-    val uriHandler = LocalUriHandler.current
     val placeholderColor = MaterialTheme.colorScheme.surfaceContainerHighest
 
     Column(
@@ -538,7 +549,7 @@ private fun ArticleDetailContent(
 
         article.video?.takeIf { it.url?.let(::isSafeVideoUrl) == true }?.let { video ->
             Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
-            VideoPreviewCard(video = video, onOpen = { uriHandler.openUri(it) })
+            VideoPreviewCard(video = video, onOpen = onOpenVideo)
         }
 
         if (article.tags.isNotEmpty()) {

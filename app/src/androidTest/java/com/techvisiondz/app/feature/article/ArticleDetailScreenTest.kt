@@ -283,6 +283,38 @@ class ArticleDetailScreenTest {
     }
 
     @Test
+    fun videoCardWatchActionInvokesHandlerWithValidatedUrl() {
+        var openedUrl: String? = null
+        val article = sampleArticle(
+            title = "Article with video",
+            body = null,
+            video = VideoRef(kind = "embed", url = "   https://example.com/watch/abc   "),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                ArticleDetailScreen(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onOpenVideo = { openedUrl = it },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_video_watch))
+            .performScrollTo()
+            .performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("https://example.com/watch/abc", openedUrl)
+    }
+
+    @Test
     fun softwareCardShowsUnavailableForUnsupportedScheme() {
         val article = sampleArticle(
             title = "Article with a bad link",
