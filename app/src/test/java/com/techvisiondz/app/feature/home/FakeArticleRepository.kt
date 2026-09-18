@@ -9,6 +9,7 @@ import com.techvisiondz.app.core.data.model.CategorySummary
 import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagSummary
 import com.techvisiondz.app.core.data.repository.ArticleRepository
+import kotlinx.coroutines.CompletableDeferred
 
 /** Deterministic repository for unit / UI tests. No network involved. */
 class FakeArticleRepository(
@@ -73,10 +74,37 @@ class FakeArticleRepository(
     var searchCalls: Int = 0
         private set
 
-    override suspend fun getHomeFeed(languageCode: String): List<ArticleCard> {
+    /** Number of [getHomeFeed] calls. */
+    var feedCalls: Int = 0
+        private set
+
+    /** Last paging offsets/limits passed to each paged call. */
+    var lastFeedOffset: Int = 0
+        private set
+    var lastFeedLimit: Int = 0
+        private set
+    var lastSearchOffset: Int = 0
+        private set
+    var lastSearchLimit: Int = 0
+        private set
+
+    /**
+     * When set, [getHomeFeed] suspends until this gate is completed, letting
+     * tests hold a request in flight (for load-more / refresh races).
+     */
+    var feedGate: CompletableDeferred<Unit>? = null
+
+    /** Same as [feedGate] but for [searchArticles]. */
+    var searchGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun getHomeFeed(languageCode: String, offset: Int, limit: Int): List<ArticleCard> {
         lastLanguageCode = languageCode
+        lastFeedOffset = offset
+        lastFeedLimit = limit
+        feedCalls++
+        feedGate?.await()
         error?.let { throw it }
-        return articles
+        return articles.drop(offset).take(limit)
     }
 
     override suspend fun getArticle(slug: String, languageCode: String): Article? {
@@ -126,12 +154,15 @@ class FakeArticleRepository(
         return tagArticles[slug] ?: emptyList()
     }
 
-    override suspend fun searchArticles(query: String, languageCode: String, limit: Int): List<ArticleCard> {
+    override suspend fun searchArticles(query: String, languageCode: String, offset: Int, limit: Int): List<ArticleCard> {
         lastSearchQuery = query
         lastSearchLanguage = languageCode
+        lastSearchOffset = offset
+        lastSearchLimit = limit
         searchCalls++
+        searchGate?.await()
         searchError?.let { throw it }
-        return searchResults
+        return searchResults.drop(offset).take(limit)
     }
 }
 

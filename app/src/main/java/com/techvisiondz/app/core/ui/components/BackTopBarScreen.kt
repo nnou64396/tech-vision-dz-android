@@ -26,7 +26,8 @@ import com.techvisiondz.app.R
  * matching the website's header border) showing a fixed [title] plus a back
  * button. Used by the discovery sections (categories / authors / tags and their
  * article lists) and search so every such screen shares the same chrome and
- * back navigation.
+ * back navigation. [snackbarHost] lets screens surface transient messages (e.g.
+ * a failed pull-to-refresh) without nesting a second scaffold.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,11 +35,13 @@ fun BackTopBarScreen(
     title: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { snackbarHost() },
         topBar = {
             Column {
                 TopAppBar(

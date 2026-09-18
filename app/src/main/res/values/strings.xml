@@ -3,6 +3,9 @@
     <string name="home_tagline">Technology vision for Algeria</string>
     <string name="home_empty">No articles yet</string>
     <string name="retry">Retry</string>
+    <string name="load_more">Load more</string>
+    <string name="load_more_error">Could not load more articles. Check your connection</string>
+    <string name="refresh_error">Could not refresh. Check your connection</string>
     <string name="article_not_found">Article not found</string>
     <string name="article_error">Could not load the article</string>
     <string name="article_software">Software: %1$s</string>
@@ -30,8 +33,14 @@
     <string name="authors_empty">No authors yet</string>
     <string name="tags_empty">No tags yet</string>
     <string name="categories_error">Could not load the categories</string>
+    <string name="category_articles_empty">No articles in this category yet</string>
+    <string name="category_articles_error">Could not load category articles</string>
     <string name="authors_error">Could not load the authors</string>
+    <string name="author_articles_empty">No articles by this author yet</string>
+    <string name="author_articles_error">Could not load author articles</string>
     <string name="tags_error">Could not load the tags</string>
+    <string name="tag_articles_empty">No articles with this tag yet</string>
+    <string name="tag_articles_error">Could not load tag articles</string>
     <string name="search">Search</string>
     <string name="search_articles">Search articles</string>
     <string name="search_placeholder">What are you looking for?</string>

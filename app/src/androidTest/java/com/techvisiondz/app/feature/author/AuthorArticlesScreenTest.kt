@@ -46,7 +46,7 @@ class AuthorArticlesScreenTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.home_empty)).assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.author_articles_empty)).assertIsDisplayed()
     }
 
     @Test

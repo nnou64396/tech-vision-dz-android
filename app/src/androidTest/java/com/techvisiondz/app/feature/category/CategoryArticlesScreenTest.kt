@@ -46,7 +46,7 @@ class CategoryArticlesScreenTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.home_empty)).assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.category_articles_empty)).assertIsDisplayed()
     }
 
     @Test

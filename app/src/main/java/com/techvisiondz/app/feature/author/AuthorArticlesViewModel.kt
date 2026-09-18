@@ -17,8 +17,10 @@ import kotlinx.coroutines.launch
 
 /**
  * Author article listing state holder. Loads published article cards for an
- * author slug through the existing card RPC and exposes the standard
- * loading/success/empty/error contract.
+ * author slug through the existing card RPC (one request, no pagination) and
+ * exposes the standard loading/success/empty/error contract. [refresh] reloads
+ * the list behind the pull-to-refresh indicator without discarding shown
+ * content on failure.
  */
 class AuthorArticlesViewModel(
     private val repository: ArticleRepository,
@@ -28,6 +30,13 @@ class AuthorArticlesViewModel(
 
     private val _uiState = MutableStateFlow<UiState<List<ArticleCard>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<ArticleCard>>> = _uiState.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    /** One-shot message for a failed [refresh] while articles were already shown. */
+    private val _refreshError = MutableStateFlow<String?>(null)
+    val refreshError: StateFlow<String?> = _refreshError.asStateFlow()
 
     init {
         loadArticles()
@@ -49,6 +58,33 @@ class AuthorArticlesViewModel(
                 UiState.Error(e.message ?: "Unable to load articles")
             }
         }
+    }
+
+    /** Reloads the author's articles in place behind a refresh indicator. */
+    fun refresh() {
+        if (_isRefreshing.value) return
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            try {
+                val articles = repository.getArticlesByAuthor(slug, defaultLanguage)
+                _uiState.value = if (articles.isEmpty()) {
+                    UiState.Empty()
+                } else {
+                    UiState.Success(articles)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Keep the shown articles; surface the failure as a message.
+                _refreshError.value = e.message
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun consumeRefreshError() {
+        _refreshError.value = null
     }
 
     companion object {

@@ -46,7 +46,7 @@ class TagArticlesScreenTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.home_empty)).assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.tag_articles_empty)).assertIsDisplayed()
     }
 
     @Test

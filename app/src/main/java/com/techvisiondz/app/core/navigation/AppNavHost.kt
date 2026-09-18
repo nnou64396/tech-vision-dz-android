@@ -89,6 +89,18 @@ fun AppNavHost(
     val authState by authRepository.authState.collectAsState(initial = AuthState.Loading)
     val isAuthenticated = authState is AuthState.Authenticated
 
+    // Navigating to the article already shown (e.g. tapping the same related
+    // card) would push a duplicate detail screen on top of itself. Guarding
+    // here keeps the back stack stable and the same article from stacking.
+    fun navigateToArticle(slug: String) {
+        val current = navController.currentBackStackEntry
+        val alreadyOpen = current?.destination?.hasRoute(Routes.ArticleDetail::class) == true &&
+            current.toRoute<Routes.ArticleDetail>().slug == slug
+        if (!alreadyOpen) {
+            navController.navigate(Routes.ArticleDetail(slug))
+        }
+    }
+
     // An updater ViewModel passed from the app root is shared app-wide (single
     // instance for both the startup dialog host and the Account row). When
     // none is supplied (tests / standalone embedding), a session-scoped one is
@@ -121,7 +133,7 @@ fun AppNavHost(
         }
         composable<Routes.Home> {
             HomeScreen(
-                onArticleClick = { slug -> navController.navigate(Routes.ArticleDetail(slug)) },
+                onArticleClick = ::navigateToArticle,
                 onSearchClick = { navController.navigate(Routes.Search) },
                 onCategoriesClick = { navController.navigate(Routes.Categories) },
                 onAuthorsClick = { navController.navigate(Routes.Authors) },
@@ -152,14 +164,14 @@ fun AppNavHost(
         composable<Routes.SavedArticles> {
             SavedArticlesScreen(
                 onBack = { navController.popBackStack() },
-                onArticleClick = { slug -> navController.navigate(Routes.ArticleDetail(slug)) },
+                onArticleClick = ::navigateToArticle,
                 viewModel = viewModel(factory = SavedArticlesViewModel.factory(savedArticleRepository)),
             )
         }
         composable<Routes.Search> {
             SearchScreen(
                 onBack = { navController.popBackStack() },
-                onArticleClick = { slug -> navController.navigate(Routes.ArticleDetail(slug)) },
+                onArticleClick = ::navigateToArticle,
                 viewModel = viewModel(factory = SearchViewModel.factory(repository)),
             )
         }
@@ -171,7 +183,7 @@ fun AppNavHost(
                     key = "article-detail-$slug",
                     factory = ArticleDetailViewModel.factory(slug, repository, savedArticleRepository),
                 ),
-                onRelatedArticleClick = { relatedSlug -> navController.navigate(Routes.ArticleDetail(relatedSlug)) },
+                onRelatedArticleClick = ::navigateToArticle,
                 isAuthenticated = isAuthenticated,
                 onRequireSignIn = { navController.navigate(Routes.SignIn) },
                 onShareArticle = { article ->
@@ -200,7 +212,7 @@ fun AppNavHost(
             val slug = backStackEntry.toRoute<Routes.CategoryArticles>().slug
             CategoryArticlesScreen(
                 onBack = { navController.popBackStack() },
-                onArticleClick = { articleSlug -> navController.navigate(Routes.ArticleDetail(articleSlug)) },
+                onArticleClick = ::navigateToArticle,
                 viewModel = viewModel(
                     key = "category-articles-$slug",
                     factory = CategoryArticlesViewModel.factory(slug, repository),
@@ -218,7 +230,7 @@ fun AppNavHost(
             val slug = backStackEntry.toRoute<Routes.AuthorArticles>().slug
             AuthorArticlesScreen(
                 onBack = { navController.popBackStack() },
-                onArticleClick = { articleSlug -> navController.navigate(Routes.ArticleDetail(articleSlug)) },
+                onArticleClick = ::navigateToArticle,
                 viewModel = viewModel(
                     key = "author-articles-$slug",
                     factory = AuthorArticlesViewModel.factory(slug, repository),
@@ -236,7 +248,7 @@ fun AppNavHost(
             val slug = backStackEntry.toRoute<Routes.TagArticles>().slug
             TagArticlesScreen(
                 onBack = { navController.popBackStack() },
-                onArticleClick = { articleSlug -> navController.navigate(Routes.ArticleDetail(articleSlug)) },
+                onArticleClick = ::navigateToArticle,
                 viewModel = viewModel(
                     key = "tag-articles-$slug",
                     factory = TagArticlesViewModel.factory(slug, repository),

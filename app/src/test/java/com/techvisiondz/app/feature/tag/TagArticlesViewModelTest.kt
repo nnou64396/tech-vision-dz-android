@@ -71,4 +71,45 @@ class TagArticlesViewModelTest {
 
         assertTrue(viewModel.uiState.value is UiState.Error)
     }
+
+    @Test
+    fun `refresh reloads the tag articles in place`() = runTest(dispatcher) {
+        val cards = listOf(sampleArticleCard(id = "a1"), sampleArticleCard(id = "a2"))
+        val repository = FakeArticleRepository(tagArticles = mapOf("ai" to cards))
+        val viewModel = TagArticlesViewModel(repository = repository, slug = "ai")
+
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value is UiState.Success)
+
+        val updated = listOf(sampleArticleCard(id = "a3", title = "محدث"))
+        repository.tagArticles = mapOf("ai" to updated)
+
+        viewModel.refresh()
+        assertTrue(viewModel.isRefreshing.value)
+        advanceUntilIdle()
+
+        assertTrue(!viewModel.isRefreshing.value)
+        assertEquals(updated, (viewModel.uiState.value as UiState.Success).data)
+    }
+
+    @Test
+    fun `refresh failure keeps content and records the refresh error`() = runTest(dispatcher) {
+        val cards = listOf(sampleArticleCard(id = "a1"))
+        val repository = FakeArticleRepository(tagArticles = mapOf("ai" to cards))
+        val viewModel = TagArticlesViewModel(repository = repository, slug = "ai")
+
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value is UiState.Success)
+
+        repository.error = DataException.Network("Could not reach the server")
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertTrue(!viewModel.isRefreshing.value)
+        assertEquals(cards, (viewModel.uiState.value as UiState.Success).data)
+        assertEquals("Could not reach the server", viewModel.refreshError.value)
+
+        viewModel.consumeRefreshError()
+        assertEquals(null, viewModel.refreshError.value)
+    }
 }

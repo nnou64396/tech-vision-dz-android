@@ -15,11 +15,18 @@ import com.techvisiondz.app.core.data.model.Tag
 interface ArticleRepository {
 
     /**
-     * Loads the published home feed. Exactly mirrors the site's feed: only
-     * `status = published` articles, ordered by `published_at` descending, with
-     * translations resolved for [languageCode] (falling back per article).
+     * Loads a page of the published home feed. Exactly mirrors the site's feed:
+     * only `status = published` articles, ordered by `published_at` descending,
+     * with translations resolved for [languageCode] (falling back per article).
+     *
+     * Pagination is offset-based ([offset] rows skipped, at most [limit] rows
+     * returned). A page smaller than [limit] means no further pages exist.
      */
-    suspend fun getHomeFeed(languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE): List<ArticleCard>
+    suspend fun getHomeFeed(
+        languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE,
+        offset: Int = 0,
+        limit: Int = 30,
+    ): List<ArticleCard>
 
     /**
      * Loads a single published article by slug via the backend RPC. Returns null
@@ -46,10 +53,24 @@ interface ArticleRepository {
     suspend fun getArticlesByTag(slug: String, languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE): List<ArticleCard>
 
     /**
-     * Searches published article cards whose [languageCode] translation title
-     * or excerpt contains [query] (case-insensitive ILIKE), newest first,
-     * limited to [limit] results. Implementations trim [query]; a blank query
-     * yields an empty list without any request.
+     * Searches a page of published article cards whose [languageCode]
+     * translation title or excerpt contains [query] (case-insensitive ILIKE),
+     * newest first, skipping [offset] rows and returning at most [limit]
+     * results. A page smaller than [limit] means no further pages exist.
+     * Implementations trim [query]; a blank query yields an empty list without
+     * any request.
      */
-    suspend fun searchArticles(query: String, languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE, limit: Int = 30): List<ArticleCard>
+    suspend fun searchArticles(
+        query: String,
+        languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE,
+        offset: Int = 0,
+        limit: Int = 30,
+    ): List<ArticleCard>
 }
+
+/**
+ * Page size used by the discovery screens (home feed and search) for
+ * incremental "load more" browsing. Kept deliberately small so the app never
+ * fetches the whole catalog at once.
+ */
+const val ARTICLE_PAGE_SIZE = 20

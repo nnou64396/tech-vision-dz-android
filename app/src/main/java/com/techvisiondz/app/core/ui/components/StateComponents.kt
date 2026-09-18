@@ -3,11 +3,14 @@ package com.techvisiondz.app.core.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,16 +19,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.techvisiondz.app.R
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
+import com.techvisiondz.app.ui.theme.TechVisionSpacing
 
 /** Branded loading state: the site's spinner tone + a loading label. */
 @Composable
@@ -96,6 +102,71 @@ fun EmptyState(
                 .align(Alignment.CenterHorizontally)
                 .padding(24.dp),
         )
+    }
+}
+
+/**
+ * Footer of a paginated article list. While [hasMore] is true it requests the
+ * next page as soon as it scrolls into view (auto load-more), shows the
+ * loading-more indicator while a page is in flight and, on failure, keeps the
+ * already-loaded cards and offers an accessible Retry action. When [error] is
+ * set no automatic request is made so the user can deliberately retry.
+ */
+@Composable
+fun LoadMoreFooter(
+    hasMore: Boolean,
+    isLoadingMore: Boolean,
+    error: String?,
+    onLoadMore: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LaunchedEffect(isLoadingMore, error) {
+        if (hasMore && !isLoadingMore && error == null) {
+            onLoadMore()
+        }
+    }
+
+    if (error != null) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = TechVisionSpacing.Lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = error.ifBlank { stringResource(R.string.load_more_error) },
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
+            TechGradientButton(
+                text = stringResource(R.string.retry),
+                onClick = onRetry,
+                modifier = Modifier.testTag("load_more_retry"),
+            )
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = TechVisionSpacing.Lg),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
+            Text(
+                text = stringResource(R.string.load_more),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

@@ -18,15 +18,21 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,7 +55,9 @@ import com.techvisiondz.app.ui.theme.TechVisionSpacing
  * Home screen — the app's brand command center. Loads the real published feed
  * through the [HomeViewModel] and renders it as an Arabic-first editorial list:
  * brand header, prominent search entry, discovery menu, then a hero-first feed.
+ * The feed supports incremental load-more paging and pull-to-refresh.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
@@ -61,10 +69,25 @@ fun HomeScreen(
     onAccountClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val refreshError by viewModel.refreshError.collectAsState()
+    val refreshErrorMessage = stringResource(R.string.refresh_error)
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(refreshError) {
+        val message = refreshError
+        if (message != null) {
+            snackbarHostState.showSnackbar(
+                message.ifBlank { refreshErrorMessage },
+            )
+            viewModel.consumeRefreshError()
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(bottom = TechVisionSpacing.Lg)) {
             HomeHeader(
@@ -74,31 +97,42 @@ fun HomeScreen(
                 onTagsClick = onTagsClick,
                 onAccountClick = onAccountClick,
             )
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (val state = uiState) {
-                    is UiState.Loading -> LoadingState()
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (val state = uiState) {
+                        is UiState.Loading -> LoadingState()
 
-                    is UiState.Error -> ErrorState(
-                        message = state.message,
-                        onRetry = viewModel::loadHome,
-                    )
+                        is UiState.Error -> ErrorState(
+                            message = state.message,
+                            onRetry = viewModel::loadHome,
+                        )
 
-                    is UiState.Empty -> EmptyState(
-                        message = state.message.ifEmpty { stringResource(R.string.home_empty) },
-                    )
+                        is UiState.Empty -> EmptyState(
+                            message = state.message.ifEmpty { stringResource(R.string.home_empty) },
+                        )
 
-                    is UiState.Success -> {
-                        if (state.data.articles.isEmpty()) {
-                            EmptyState(message = stringResource(R.string.home_empty))
-                        } else {
-                            ArticleList(
-                                articles = state.data.articles,
-                                onArticleClick = onArticleClick,
-                                featuredFirst = true,
-                                header = {
-                                    SectionHeader(title = stringResource(R.string.home_feed))
-                                },
-                            )
+                        is UiState.Success -> {
+                            if (state.data.articles.isEmpty()) {
+                                EmptyState(message = stringResource(R.string.home_empty))
+                            } else {
+                                ArticleList(
+                                    articles = state.data.articles,
+                                    onArticleClick = onArticleClick,
+                                    featuredFirst = true,
+                                    header = {
+                                        SectionHeader(title = stringResource(R.string.home_feed))
+                                    },
+                                    hasMore = state.data.hasMore,
+                                    isLoadingMore = state.data.isLoadingMore,
+                                    loadMoreError = state.data.loadMoreError,
+                                    onLoadMore = viewModel::loadMore,
+                                    onRetryLoadMore = viewModel::loadMore,
+                                )
+                            }
                         }
                     }
                 }

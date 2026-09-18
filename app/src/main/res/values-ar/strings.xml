@@ -4,6 +4,9 @@
     <string name="home_tagline">رؤية التقنية في الجزائر</string>
     <string name="home_empty">لا توجد مقالات بعد</string>
     <string name="retry">إعادة المحاولة</string>
+    <string name="load_more">تحميل المزيد</string>
+    <string name="load_more_error">تعذر تحميل المزيد من المقالات. تحقق من اتصالك</string>
+    <string name="refresh_error">تعذر التحديث. تحقق من اتصالك</string>
     <string name="article_not_found">المقال غير موجود</string>
     <string name="article_error">تعذر تحميل المقال</string>
     <string name="article_software">البرمجيات: %1$s</string>
@@ -31,8 +34,14 @@
     <string name="authors_empty">لا يوجد مؤلفون بعد</string>
     <string name="tags_empty">لا توجد وسوم بعد</string>
     <string name="categories_error">تعذر تحميل الفئات</string>
+    <string name="category_articles_empty">لا توجد مقالات في هذه الفئة بعد</string>
+    <string name="category_articles_error">تعذر تحميل مقالات الفئة</string>
     <string name="authors_error">تعذر تحميل المؤلفين</string>
+    <string name="author_articles_empty">لا توجد مقالات لهذا المؤلف بعد</string>
+    <string name="author_articles_error">تعذر تحميل مقالات المؤلف</string>
     <string name="tags_error">تعذر تحميل الوسوم</string>
+    <string name="tag_articles_empty">لا توجد مقالات بهذا الوسم بعد</string>
+    <string name="tag_articles_error">تعذر تحميل مقالات الوسم</string>
     <string name="search">بحث</string>
     <string name="search_articles">ابحث عن المقالات</string>
     <string name="search_placeholder">ما الذي تبحث عنه؟</string>

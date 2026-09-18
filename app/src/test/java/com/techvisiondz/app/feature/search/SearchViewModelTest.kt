@@ -2,9 +2,11 @@ package com.techvisiondz.app.feature.search
 
 import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
+import com.techvisiondz.app.core.data.repository.ARTICLE_PAGE_SIZE
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticleCard
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -47,7 +50,7 @@ class SearchViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
-        assertEquals("نتيجة البحث", (state as UiState.Success).data.single().title)
+        assertEquals("نتيجة البحث", (state as UiState.Success).data.articles.single().title)
         assertEquals("android", repository.lastSearchQuery)
         assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastSearchLanguage)
         assertEquals(1, repository.searchCalls)
@@ -123,7 +126,7 @@ class SearchViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
-        assertEquals("Retried", (state as UiState.Success).data.single().title)
+        assertEquals("Retried", (state as UiState.Success).data.articles.single().title)
         assertEquals(2, repository.searchCalls)
     }
 
@@ -195,7 +198,7 @@ class SearchViewModelTest {
         assertEquals("androidx", repository.lastSearchQuery)
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
-        assertEquals("محدث", (state as UiState.Success).data.single().title)
+        assertEquals("محدث", (state as UiState.Success).data.articles.single().title)
     }
 
     @Test
@@ -240,5 +243,198 @@ class SearchViewModelTest {
         assertEquals("android studio", normalizeSearchQuery("   android   studio  "))
         assertEquals("", normalizeSearchQuery("   "))
         assertEquals("", normalizeSearchQuery(""))
+    }
+
+    @Test
+    fun `search requests the first page with the shared page size`() = runTest(dispatcher) {
+        val results = (1..ARTICLE_PAGE_SIZE).map { sampleArticleCard(id = "a$it") }
+        val repository = FakeArticleRepository(searchResults = results)
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is UiState.Success)
+        assertEquals(ARTICLE_PAGE_SIZE, (state as UiState.Success).data.articles.size)
+        assertTrue((state as UiState.Success).data.hasMore)
+        assertEquals(0, repository.lastSearchOffset)
+        assertEquals(ARTICLE_PAGE_SIZE, repository.lastSearchLimit)
+    }
+
+    @Test
+    fun `loadMore appends the next page of the active query`() = runTest(dispatcher) {
+        val results = (1..35).map { sampleArticleCard(id = "a$it") }
+        val repository = FakeArticleRepository(searchResults = results)
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+        assertEquals(ARTICLE_PAGE_SIZE, (viewModel.uiState.value as UiState.Success).data.articles.size)
+
+        viewModel.loadMore()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is UiState.Success)
+        assertEquals(35, (state as UiState.Success).data.articles.size)
+        assertEquals(35, (state as UiState.Success).data.articles.distinctBy { it.id }.size)
+        assertFalse((state as UiState.Success).data.hasMore)
+        assertEquals(ARTICLE_PAGE_SIZE, repository.lastSearchOffset)
+        assertEquals(ARTICLE_PAGE_SIZE, repository.lastSearchLimit)
+    }
+
+    @Test
+    fun `loadMore ignores a request when the typed query differs from the active one`() = runTest(dispatcher) {
+        val results = (1..35).map { sampleArticleCard(id = "a$it") }
+        val repository = FakeArticleRepository(searchResults = results)
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+        assertEquals(1, repository.searchCalls)
+
+        viewModel.onQueryChange("ios")
+        runCurrent()
+        viewModel.loadMore()
+        runCurrent()
+
+        assertEquals(1, repository.searchCalls)
+        assertFalse((viewModel.uiState.value as UiState.Success).data.isLoadingMore)
+    }
+
+    @Test
+    fun `loadMore failure keeps the results and exposes the error`() = runTest(dispatcher) {
+        val results = (1..35).map { sampleArticleCard(id = "a$it") }
+        val repository = FakeArticleRepository(searchResults = results)
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+
+        repository.searchError = DataException.Network("Could not reach the server")
+        viewModel.loadMore()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is UiState.Success)
+        val data = (state as UiState.Success).data
+        assertEquals(ARTICLE_PAGE_SIZE, data.articles.size)
+        assertTrue(data.hasMore)
+        assertFalse(data.isLoadingMore)
+        assertEquals("Could not reach the server", data.loadMoreError)
+
+        repository.searchError = null
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertNull((viewModel.uiState.value as UiState.Success).data.loadMoreError)
+        assertEquals(35, (viewModel.uiState.value as UiState.Success).data.articles.size)
+    }
+
+    @Test
+    fun `refresh reloads the first page of the active query`() = runTest(dispatcher) {
+        val results = (1..35).map { sampleArticleCard(id = "a$it") }
+        val repository = FakeArticleRepository(searchResults = results)
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertEquals(35, (viewModel.uiState.value as UiState.Success).data.articles.size)
+
+        repository.searchResults = (1..19).map { sampleArticleCard(id = "b$it") }
+        viewModel.refresh()
+        assertTrue(viewModel.isRefreshing.value)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isRefreshing.value)
+        assertEquals(19, (viewModel.uiState.value as UiState.Success).data.articles.size)
+        assertFalse((viewModel.uiState.value as UiState.Success).data.hasMore)
+        assertEquals(0, repository.lastSearchOffset)
+    }
+
+    @Test
+    fun `refresh with no active query is a no-op`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository()
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isRefreshing.value)
+        assertEquals(0, repository.searchCalls)
+    }
+
+    @Test
+    fun `refresh failure keeps results and records the refresh error`() = runTest(dispatcher) {
+        val results = (1..ARTICLE_PAGE_SIZE).map { sampleArticleCard(id = "a$it") }
+        val repository = FakeArticleRepository(searchResults = results)
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value is UiState.Success)
+
+        repository.searchError = DataException.Network("Could not reach the server")
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.isRefreshing.value)
+        assertEquals(ARTICLE_PAGE_SIZE, (viewModel.uiState.value as UiState.Success).data.articles.size)
+        assertEquals("Could not reach the server", viewModel.refreshError.value)
+
+        viewModel.consumeRefreshError()
+        assertNull(viewModel.refreshError.value)
+    }
+
+    @Test
+    fun `a new query resets accumulated pagination state`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(searchResults = (1..35).map { sampleArticleCard(id = "a$it") })
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+        viewModel.loadMore()
+        advanceUntilIdle()
+        assertEquals(35, (viewModel.uiState.value as UiState.Success).data.articles.size)
+
+        repository.searchResults = (1..25).map { sampleArticleCard(id = "b$it") }
+        viewModel.onQueryChange("ios")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is UiState.Success)
+        assertEquals(20, (state as UiState.Success).data.articles.size)
+        assertTrue((state as UiState.Success).data.hasMore)
+        assertEquals(0, repository.lastSearchOffset)
+        assertEquals("ios", repository.lastSearchQuery)
+    }
+
+    @Test
+    fun `loadMore ignores a request while a page is already in flight`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(searchResults = (1..35).map { sampleArticleCard(id = "a$it") })
+        val viewModel = SearchViewModel(repository)
+
+        viewModel.onQueryChange("android")
+        advanceUntilIdle()
+        assertEquals(1, repository.searchCalls)
+
+        val gate = CompletableDeferred<Unit>()
+        repository.searchGate = gate
+        viewModel.loadMore()
+        runCurrent()
+        assertEquals(2, repository.searchCalls)
+        assertTrue((viewModel.uiState.value as UiState.Success).data.isLoadingMore)
+
+        viewModel.loadMore()
+        runCurrent()
+        assertEquals(2, repository.searchCalls)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse((viewModel.uiState.value as UiState.Success).data.isLoadingMore)
+        assertEquals(35, (viewModel.uiState.value as UiState.Success).data.articles.size)
     }
 }

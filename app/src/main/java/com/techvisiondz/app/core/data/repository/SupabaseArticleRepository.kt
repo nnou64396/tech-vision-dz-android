@@ -22,6 +22,7 @@ import com.techvisiondz.app.core.network.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.query.request.SelectRequestBuilder
 import io.github.jan.supabase.storage.Storage
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.buildJsonObject
@@ -41,13 +42,17 @@ class SupabaseArticleRepository(
     private val storage: Storage = SupabaseClientProvider.storage,
 ) : ArticleRepository {
 
-    override suspend fun getHomeFeed(languageCode: String): List<ArticleCard> = runTranslated {
+    override suspend fun getHomeFeed(
+        languageCode: String,
+        offset: Int,
+        limit: Int,
+    ): List<ArticleCard> = runTranslated {
         postgrest.from("articles")
             .select(Columns.raw(HOME_FEED_SELECT)) {
                 filter { eq("status", "published") }
                 filter { eq("article_translations.language_code", languageCode) }
                 order("published_at", Order.DESCENDING, nullsFirst = true)
-                limit(HOME_FEED_LIMIT)
+                pagedRange(offset, limit)
             }
             .decodeList<ArticleFeedRow>()
             .mapNotNull { it.toArticleCard(languageCode, ::resolvePublicUrl) }
@@ -107,7 +112,12 @@ class SupabaseArticleRepository(
     override suspend fun getArticlesByTag(slug: String, languageCode: String): List<ArticleCard> =
         runTranslated { rpcArticleCards(GET_PUBLISHED_ARTICLE_CARDS_BY_TAG, slug, languageCode) }
 
-    override suspend fun searchArticles(query: String, languageCode: String, limit: Int): List<ArticleCard> {
+    override suspend fun searchArticles(
+        query: String,
+        languageCode: String,
+        offset: Int,
+        limit: Int,
+    ): List<ArticleCard> {
         val normalized = query.trim()
         if (normalized.isEmpty()) return emptyList()
         val pattern = "*$normalized*"
@@ -123,7 +133,7 @@ class SupabaseArticleRepository(
                         }
                     }
                     order("published_at", Order.DESCENDING, nullsFirst = true)
-                    limit(limit.toLong())
+                    pagedRange(offset, limit)
                 }
                 .decodeList<ArticleFeedRow>()
                 .mapNotNull { it.toArticleCard(languageCode, ::resolvePublicUrl) }
@@ -146,6 +156,16 @@ class SupabaseArticleRepository(
     private fun resolvePublicUrl(bucket: String, storagePath: String): String =
         storage.from(bucket).publicUrl(storagePath)
 
+    /**
+     * Applies PostgREST's inclusive `Range` header for offset/limit paging in a
+     * single request. The header is 0-based and inclusive at both ends, so a
+     * valid `to` is `offset + limit - 1`.
+     */
+    private fun SelectRequestBuilder.pagedRange(offset: Int, limit: Int) {
+        val end = (offset + limit - 1).coerceAtLeast(offset)
+        range(offset.toLong(), end.toLong())
+    }
+
     private suspend fun <T> runTranslated(block: suspend () -> T): T = try {
         block()
     } catch (e: CancellationException) {
@@ -155,7 +175,6 @@ class SupabaseArticleRepository(
     }
 
     private companion object {
-        const val HOME_FEED_LIMIT = 30L
         const val GET_PUBLISHED_ARTICLE_BY_SLUG = "get_published_article_by_slug"
         const val GET_PUBLISHED_ARTICLE_CARDS_BY_CATEGORY = "get_published_article_cards_by_category"
         const val GET_PUBLISHED_ARTICLE_CARDS_BY_AUTHOR = "get_published_article_cards_by_author"

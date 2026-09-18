@@ -8,6 +8,7 @@ import com.techvisiondz.app.core.data.model.Category
 import com.techvisiondz.app.core.data.model.CategorySummary
 import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagSummary
+import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 
 /** Deterministic repository for instrumented UI tests. No network involved. */
@@ -66,10 +67,10 @@ class FakeArticleRepository(
     var searchCalls: Int = 0
         private set
 
-    override suspend fun getHomeFeed(languageCode: String): List<ArticleCard> {
+    override suspend fun getHomeFeed(languageCode: String, offset: Int, limit: Int): List<ArticleCard> {
         lastLanguageCode = languageCode
         error?.let { throw it }
-        return articles
+        return articles.drop(offset).take(limit)
     }
 
     override suspend fun getArticle(slug: String, languageCode: String): Article? {
@@ -118,12 +119,12 @@ class FakeArticleRepository(
         return tagArticles[slug] ?: emptyList()
     }
 
-    override suspend fun searchArticles(query: String, languageCode: String, limit: Int): List<ArticleCard> {
+    override suspend fun searchArticles(query: String, languageCode: String, offset: Int, limit: Int): List<ArticleCard> {
         lastSearchQuery = query
         lastSearchLanguage = languageCode
         searchCalls++
         searchError?.let { throw it }
-        return searchResults
+        return searchResults.drop(offset).take(limit)
     }
 }
 
@@ -174,6 +175,7 @@ fun sampleArticle(
     author: AuthorSummary = AuthorSummary(name = "TECH VISION DZ", bio = null, avatarUrl = null),
     tags: List<TagSummary> = listOf(TagSummary(slug = "ai", label = "AI")),
     coverUrl: String? = null,
+    video: VideoRef? = null,
 ) = Article(
     id = "article-$slug",
     slug = slug,
@@ -189,6 +191,6 @@ fun sampleArticle(
     tags = tags,
     coverUrl = coverUrl,
     coverAlt = null,
-    video = null,
+    video = video,
     software = null,
 )
