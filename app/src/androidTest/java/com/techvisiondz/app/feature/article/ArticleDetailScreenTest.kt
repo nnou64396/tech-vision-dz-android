@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.data.model.Article
+import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.formatViewsCount
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
@@ -147,5 +148,25 @@ class ArticleDetailScreenTest {
             .assertIsDisplayed()
             .performClick()
         assertEquals(article, sharedArticle)
+    }
+
+    @Test
+    fun videoCardShowsForSafeVideoUrl() {
+        val article = sampleArticle(
+            title = "Article with video",
+            video = VideoRef(kind = "embed", url = "https://example.com/watch?v=123"),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_video)).assertIsDisplayed()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.article_video_watch)).assertIsDisplayed()
     }
 }

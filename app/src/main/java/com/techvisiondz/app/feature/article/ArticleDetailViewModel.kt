@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.model.Article
+import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.data.repository.SavedArticleRepository
 import com.techvisiondz.app.core.ui.UiState
@@ -60,6 +61,9 @@ class ArticleDetailViewModel(
     private val _saveState = MutableStateFlow(ArticleSaveUiState())
     val saveState: StateFlow<ArticleSaveUiState> = _saveState.asStateFlow()
 
+    private val _relatedArticles = MutableStateFlow<UiState<List<ArticleCard>>>(UiState.Empty())
+    val relatedArticles: StateFlow<UiState<List<ArticleCard>>> = _relatedArticles.asStateFlow()
+
     private var currentArticleId: String? = null
 
     init {
@@ -72,16 +76,47 @@ class ArticleDetailViewModel(
             _uiState.value = try {
                 val article = repository.getArticle(slug, defaultLanguage)
                 if (article == null) {
+                    _relatedArticles.value = UiState.Empty()
                     UiState.Empty()
                 } else {
                     currentArticleId = article.id
                     refreshSaveState(article.id)
+                    loadRelatedArticles(article)
                     UiState.Success(article)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                _relatedArticles.value = UiState.Empty()
                 UiState.Error(e.message ?: "Unable to load article")
+            }
+        }
+    }
+
+    private fun loadRelatedArticles(article: Article) {
+        viewModelScope.launch {
+            _relatedArticles.value = UiState.Loading
+            try {
+                val candidates = when {
+                    !article.category?.slug.isNullOrBlank() -> repository.getArticlesByCategory(
+                        article.category!!.slug,
+                        defaultLanguage,
+                    )
+                    !article.tags.isNullOrEmpty() -> {
+                        val tag = article.tags.firstOrNull { !it.slug.isNullOrBlank() } ?: return@launch
+                        repository.getArticlesByTag(tag.slug, defaultLanguage)
+                    }
+                    else -> emptyList()
+                }
+                val related = candidates
+                    .filter { it.slug != article.slug }
+                    .distinctBy { it.id }
+                    .take(4)
+                _relatedArticles.value = if (related.isEmpty()) UiState.Empty() else UiState.Success(related)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _relatedArticles.value = UiState.Error(e.message ?: "Unable to load related articles")
             }
         }
     }

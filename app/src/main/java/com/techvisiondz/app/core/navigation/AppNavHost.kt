@@ -171,6 +171,7 @@ fun AppNavHost(
                     key = "article-detail-$slug",
                     factory = ArticleDetailViewModel.factory(slug, repository, savedArticleRepository),
                 ),
+                onRelatedArticleClick = { relatedSlug -> navController.navigate(Routes.ArticleDetail(relatedSlug)) },
                 isAuthenticated = isAuthenticated,
                 onRequireSignIn = { navController.navigate(Routes.SignIn) },
                 onShareArticle = { article ->

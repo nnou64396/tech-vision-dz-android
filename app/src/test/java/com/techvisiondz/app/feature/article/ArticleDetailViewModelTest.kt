@@ -4,6 +4,7 @@ import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.ui.UiState
 import com.techvisiondz.app.feature.auth.AuthError
+import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.feature.home.FakeArticleRepository
 import com.techvisiondz.app.feature.home.sampleArticle
 import com.techvisiondz.app.feature.saved.FakeSavedArticleRepository
@@ -49,7 +50,7 @@ class ArticleDetailViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state is UiState.Success)
         assertEquals("hello-world", (state as UiState.Success).data.slug)
-        assertEquals("hello-world", repository.lastArticleSlug)
+        assertEquals("hello-world", repository.lastArticleDetailSlug)
         assertEquals(AppConfig.DEFAULT_LANGUAGE_CODE, repository.lastLanguageCode)
     }
 
@@ -240,5 +241,74 @@ class ArticleDetailViewModelTest {
         assertEquals(AuthError.Unknown, state.error)
         // The article itself is untouched by a failed bookmark request.
         assertTrue(viewModel.uiState.value is UiState.Success)
+    }
+
+    @Test
+    fun `loads related articles by category and ignores the current article`() = runTest(dispatcher) {
+        val current = sampleArticle(
+            slug = "feature-story",
+            category = com.techvisiondz.app.core.data.model.CategorySummary(
+                slug = "tech",
+                name = "Tech",
+                description = null,
+            ),
+        )
+        val repository = FakeArticleRepository(
+            categoryArticles = mapOf(
+                "tech" to listOf(
+                    ArticleCard(
+                        id = "related-one",
+                        slug = "related-one",
+                        title = "Related one",
+                        excerpt = "First related",
+                        featured = false,
+                        publishedAt = "2026-08-02T00:00:00Z",
+                        readingTimeMinutes = 3,
+                        viewsCount = 11L,
+                        categoryName = "Tech",
+                        authorName = "TECH VISION DZ",
+                        coverUrl = null,
+                    ),
+                    ArticleCard(
+                        id = "article-feature-story",
+                        slug = "feature-story",
+                        title = "Duplicate",
+                        excerpt = "Current article duplicate",
+                        featured = false,
+                        publishedAt = "2026-08-02T00:00:00Z",
+                        readingTimeMinutes = 3,
+                        viewsCount = 11L,
+                        categoryName = "Tech",
+                        authorName = "TECH VISION DZ",
+                        coverUrl = null,
+                    ),
+                    ArticleCard(
+                        id = "related-three",
+                        slug = "related-three",
+                        title = "Related three",
+                        excerpt = "Third related",
+                        featured = false,
+                        publishedAt = "2026-08-02T00:00:00Z",
+                        readingTimeMinutes = 3,
+                        viewsCount = 11L,
+                        categoryName = "Tech",
+                        authorName = "TECH VISION DZ",
+                        coverUrl = null,
+                    ),
+                ),
+            ),
+        )
+        repository.detailArticle = current
+
+        val viewModel = ArticleDetailViewModel(repository = repository, slug = "feature-story")
+
+        advanceUntilIdle()
+
+        val state = viewModel.relatedArticles.value
+        assertTrue(state is UiState.Success)
+        assertEquals(
+            listOf("related-one", "related-three"),
+            (state as UiState.Success).data.map { it.slug },
+        )
     }
 }

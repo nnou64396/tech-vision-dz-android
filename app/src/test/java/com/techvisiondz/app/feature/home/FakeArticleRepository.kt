@@ -39,6 +39,9 @@ class FakeArticleRepository(
     var lastArticleSlug: String? = null
         private set
 
+    var lastArticleDetailSlug: String? = null
+        private set
+
     /** Article returned by [getArticle]; null means "not found". */
     var detailArticle: Article? = null
 
@@ -78,6 +81,7 @@ class FakeArticleRepository(
 
     override suspend fun getArticle(slug: String, languageCode: String): Article? {
         lastArticleSlug = slug
+        lastArticleDetailSlug = slug
         lastLanguageCode = languageCode
         error?.let { throw it }
         return detailArticle

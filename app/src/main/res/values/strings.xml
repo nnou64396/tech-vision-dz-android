@@ -7,6 +7,10 @@
     <string name="article_error">Could not load the article</string>
     <string name="article_software">Software: %1$s</string>
     <string name="article_views">%1$s views</string>
+    <string name="article_video">Video</string>
+    <string name="article_video_watch">Watch video</string>
+    <string name="related_articles_title">More from TECH VISION DZ</string>
+    <string name="related_articles_error">Could not load related articles</string>
     <string name="share_article">Share article</string>
     <plurals name="reading_time_minutes">
         <item quantity="one">%d minute read</item>

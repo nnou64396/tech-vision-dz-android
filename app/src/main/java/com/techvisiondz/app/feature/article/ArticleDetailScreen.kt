@@ -51,7 +51,11 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.Article
+import com.techvisiondz.app.core.data.model.ArticleCard as ArticleCardModel
+import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.UiState
+import com.techvisiondz.app.core.ui.components.ArticleCard
+import com.techvisiondz.app.core.ui.components.ArticleCardVariant
 import com.techvisiondz.app.core.ui.components.CategoryChip
 import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
@@ -90,11 +94,13 @@ fun ArticleDetailScreen(
     viewModel: ArticleDetailViewModel,
     onBack: () -> Unit,
     onShareArticle: ((Article) -> Unit)? = null,
+    onRelatedArticleClick: ((String) -> Unit)? = null,
     isAuthenticated: Boolean = false,
     onRequireSignIn: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
+    val relatedState by viewModel.relatedArticles.collectAsState()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -174,10 +180,99 @@ fun ArticleDetailScreen(
                 is UiState.Success -> ArticleDetailContent(
                     article = state.data,
                     saveError = saveState.error,
+                    relatedState = relatedState,
+                    onRelatedArticleClick = onRelatedArticleClick ?: {},
                 )
             }
         }
     }
+}
+
+@Composable
+private fun VideoPreviewCard(
+    video: VideoRef,
+    onOpen: (String) -> Unit,
+) {
+    val url = video.url?.trim().orEmpty()
+    if (!isSafeVideoUrl(url)) return
+
+    Surface(
+        shape = RoundedCornerShape(TechVisionRadii.Lg),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(TechVisionSpacing.Lg),
+            verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+        ) {
+            Text(
+                text = stringResource(R.string.article_video),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = url,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TechGradientButton(
+                text = stringResource(R.string.article_video_watch),
+                onClick = { onOpen(url) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RelatedArticlesSection(
+    state: UiState<List<ArticleCardModel>>,
+    onArticleClick: (String) -> Unit,
+) {
+    when (state) {
+        is UiState.Loading -> {
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+            LoadingState(modifier = Modifier.fillMaxWidth())
+        }
+        is UiState.Error -> {
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+            Text(
+                text = state.message.ifBlank { stringResource(R.string.related_articles_error) },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        is UiState.Success -> {
+            if (state.data.isEmpty()) return
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+            Text(
+                text = stringResource(R.string.related_articles_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+            state.data.forEach { related ->
+                ArticleCard(
+                    article = related,
+                    variant = ArticleCardVariant.Standard,
+                    onClick = { onArticleClick(related.slug) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+            }
+        }
+        is UiState.Empty -> Unit
+    }
+}
+
+private fun isSafeVideoUrl(url: String): Boolean {
+    val clean = url.trim()
+    if (clean.isEmpty()) return false
+    return clean.startsWith("https://") || clean.startsWith("http://")
 }
 
 @Composable
@@ -214,6 +309,8 @@ private fun BookmarkAction(
 private fun ArticleDetailContent(
     article: Article,
     saveError: AuthError?,
+    relatedState: UiState<List<ArticleCardModel>>,
+    onRelatedArticleClick: (String) -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
     val placeholderColor = MaterialTheme.colorScheme.surfaceContainerHighest
@@ -324,6 +421,11 @@ private fun ArticleDetailContent(
             )
         }
 
+        article.video?.takeIf { it.url?.let(::isSafeVideoUrl) == true }?.let { video ->
+            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+            VideoPreviewCard(video = video, onOpen = { uriHandler.openUri(it) })
+        }
+
         if (article.tags.isNotEmpty()) {
             Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
             FlowRow(
@@ -348,6 +450,11 @@ private fun ArticleDetailContent(
                 }
             }
         }
+
+        RelatedArticlesSection(
+            state = relatedState,
+            onArticleClick = onRelatedArticleClick,
+        )
 
         article.software?.let { software ->
             val softwareText = buildString {
