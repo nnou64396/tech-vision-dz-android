@@ -359,4 +359,180 @@ class ArticleDetailScreenTest {
             .assertIsDisplayed()
         composeRule.onNodeWithTag("software_download").assertDoesNotExist()
     }
+
+    @Test
+    fun softwareCardUsesFileUrlWhenOnlyStoragePresent() {
+        var openedUrl: String? = null
+        val article = sampleArticle(
+            title = "Article with a storage download",
+            body = null,
+            software = SoftwareSummary(
+                name = "Toolbar",
+                version = "2.4",
+                downloadUrl = null,
+                fileUrl = "https://cdn.example/toolbar-v2.4.apk",
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                ArticleDetailScreen(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onDownloadClick = { openedUrl = it },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("software_download").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("https://cdn.example/toolbar-v2.4.apk", openedUrl)
+        composeRule.onNodeWithTag("software_download_file").assertDoesNotExist()
+    }
+
+    @Test
+    fun softwareCardShowsBothTargetsWhenExternalAndStoragePresent() {
+        var openedUrl: String? = null
+        val article = sampleArticle(
+            title = "Article with two download targets",
+            body = null,
+            software = SoftwareSummary(
+                name = "Toolbar",
+                version = "2.4",
+                downloadUrl = "https://releases.example/toolbar.apk",
+                fileUrl = "https://cdn.example/toolbar-v2.4.apk",
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                ArticleDetailScreen(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onDownloadClick = { openedUrl = it },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("software_download").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("software_download_file").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("https://cdn.example/toolbar-v2.4.apk", openedUrl)
+    }
+
+    @Test
+    fun softwareCardIgnoresUnsafeFileUrl() {
+        val article = sampleArticle(
+            title = "Article with an unsafe storage download",
+            body = null,
+            software = SoftwareSummary(
+                name = "App",
+                version = null,
+                downloadUrl = "https://example.com/a",
+                fileUrl = "javascript:alert(1)",
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("software_download").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("software_download_file").assertDoesNotExist()
+    }
+
+    @Test
+    fun tagPillClickInvokesHandlerWithSlug() {
+        var clickedSlug: String? = null
+        val article = sampleArticle(
+            title = "Article with a clickable tag",
+            tags = listOf(com.techvisiondz.app.core.data.model.TagSummary(slug = "ai", label = "ذكاء اصطناعي")),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme {
+                ArticleDetailScreen(
+                    viewModel = viewModel,
+                    onBack = {},
+                    onTagClick = { clickedSlug = it },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("ذكاء اصطناعي").performScrollTo().performClick()
+        composeRule.waitForIdle()
+
+        assertEquals("ai", clickedSlug)
+    }
+
+    @Test
+    fun authorStripShowsBioAndAvatarWhenPresent() {
+        val article = sampleArticle(
+            title = "Article with an author bio and avatar",
+            author = com.techvisiondz.app.core.data.model.AuthorSummary(
+                name = "محرر TECH VISION DZ",
+                bio = "صحفي تقني يغطي أخبار التكنولوجيا في الجزائر.",
+                avatarUrl = "https://cdn.example/avatars/editor.png",
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("صحفي تقني يغطي أخبار التكنولوجيا في الجزائر.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("محرر TECH VISION DZ").assertExists()
+    }
+
+    @Test
+    fun authorStripHiddenWithoutBioAndAvatar() {
+        val article = sampleArticle(
+            title = "Article without author extras",
+            author = com.techvisiondz.app.core.data.model.AuthorSummary(
+                name = "محرر TECH VISION DZ",
+                bio = null,
+                avatarUrl = null,
+            ),
+        )
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply { detailArticle = article },
+            slug = article.slug,
+        )
+
+        composeRule.setContent {
+            TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithContentDescription("محرر TECH VISION DZ").assertDoesNotExist()
+    }
 }

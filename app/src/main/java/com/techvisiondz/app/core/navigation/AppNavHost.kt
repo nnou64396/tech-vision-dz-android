@@ -85,6 +85,7 @@ fun AppNavHost(
     savedArticleRepository: SavedArticleRepository = remember { SupabaseSavedArticleRepository() },
     updateViewModel: UpdateViewModel? = null,
     settingsViewModel: SettingsViewModel? = null,
+    deepLinkTarget: DeepLinkTarget? = null,
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -101,6 +102,29 @@ fun AppNavHost(
             current.toRoute<Routes.ArticleDetail>().slug == slug
         if (!alreadyOpen) {
             navController.navigate(Routes.ArticleDetail(slug))
+        }
+    }
+
+    // Mirrors the article guard: tapping the tag already shown under the same
+    // slug never pushes a duplicate TagArticles screen on top of itself.
+    fun navigateToTagArticles(slug: String) {
+        val current = navController.currentBackStackEntry
+        val alreadyOpen = current?.destination?.hasRoute(Routes.TagArticles::class) == true &&
+            current.toRoute<Routes.TagArticles>().slug == slug
+        if (!alreadyOpen) {
+            navController.navigate(Routes.TagArticles(slug))
+        }
+    }
+
+    // A VIEW intent (cold start or delivered while alive) is resolved by
+    // MainActivity into a [DeepLinkTarget] and navigated here, where this nav
+    // controller is the single source of truth. The guard above prevents a
+    // deep link from stacking the article that is already open, and an
+    // unsupported target (null from the resolver) never navigates at all.
+    LaunchedEffect(deepLinkTarget) {
+        val target = deepLinkTarget ?: return@LaunchedEffect
+        when (target) {
+            is DeepLinkTarget.Article -> navigateToArticle(target.slug)
         }
     }
 
@@ -204,6 +228,7 @@ fun AppNavHost(
                     factory = ArticleDetailViewModel.factory(slug, repository, savedArticleRepository),
                 ),
                 onRelatedArticleClick = ::navigateToArticle,
+                onTagClick = ::navigateToTagArticles,
                 isAuthenticated = isAuthenticated,
                 onRequireSignIn = { navController.navigate(Routes.SignIn) },
                 onShareArticle = { article ->
@@ -260,7 +285,7 @@ fun AppNavHost(
         composable<Routes.Tags> {
             TagListScreen(
                 onBack = { navController.popBackStack() },
-                onTagClick = { slug -> navController.navigate(Routes.TagArticles(slug)) },
+                onTagClick = ::navigateToTagArticles,
                 viewModel = viewModel(factory = TagViewModel.factory(repository)),
             )
         }

@@ -57,6 +57,7 @@ data class SoftwareSummary(
     val name: String,
     val version: String?,
     val downloadUrl: String?,
+    val fileUrl: String? = null,
 )
 
 /**
@@ -172,9 +173,27 @@ fun ArticleRpcDoc.toArticle(
         coverAlt = cover?.alt,
         video = video?.toVideoRef(resolvePublicUrl),
         software = software?.takeIf { !it.name.isNullOrBlank() }?.let {
-            SoftwareSummary(name = it.name!!, version = it.version, downloadUrl = it.downloadUrl)
+            SoftwareSummary(
+                name = it.name!!,
+                version = it.version,
+                downloadUrl = it.downloadUrl,
+                // The sibling `download` object describes the actual artifact
+                // stored in Supabase Storage (bucket + storage_path). Resolving
+                // it through the same public-URL helper used for covers and
+                // avatars exposes the direct file target alongside the external
+                // URL, without inventing any new backend field.
+                fileUrl = download?.resolveDownloadUrl(resolvePublicUrl),
+            )
         },
     )
+}
+
+/** Resolves a storage-backed download artifact to its public URL, or null when incomplete. */
+private fun DownloadDoc.resolveDownloadUrl(resolvePublicUrl: (bucket: String, storagePath: String) -> String): String? {
+    val b = bucket
+    val p = storagePath
+    if (b.isNullOrBlank() || p.isNullOrBlank()) return null
+    return resolvePublicUrl(b, p)
 }
 
 private fun MediaDoc.resolveUrl(resolvePublicUrl: (bucket: String, storagePath: String) -> String): String? {

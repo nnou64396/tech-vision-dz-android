@@ -34,6 +34,24 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Canonical article deep links shared by the app/website. Matches
+                 ONLY https://techvisiondz.com/article/{slug} — the exact URL
+                 ArticleUrlBuilder produces — so a tapped shared link opens the
+                 article directly (cold start or while the activity is alive).
+                 The matching host/path are enforced again at runtime by
+                 DeepLinkResolver and any unsupported URL fails safely. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="https"
+                    android:host="techvisiondz.com"
+                    android:pathPrefix="/article/" />
+            </intent-filter>
         </activity>
 
         <!-- Temporary in-app APK updater: exposes ONLY the dedicated internal

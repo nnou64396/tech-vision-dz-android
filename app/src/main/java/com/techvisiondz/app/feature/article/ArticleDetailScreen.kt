@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -71,6 +72,7 @@ import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.core.ui.formatViewsCount
 import com.techvisiondz.app.core.util.DownloadUrlPolicy
 import com.techvisiondz.app.core.util.htmlBodySpanned
+import com.techvisiondz.app.core.util.VideoUrlPolicy
 import com.techvisiondz.app.core.util.spannedToAnnotatedString
 import com.techvisiondz.app.feature.auth.AuthError
 import com.techvisiondz.app.ui.theme.TechVisionRadii
@@ -113,6 +115,7 @@ fun ArticleDetailScreen(
     onBack: () -> Unit,
     onShareArticle: ((Article) -> Unit)? = null,
     onRelatedArticleClick: ((String) -> Unit)? = null,
+    onTagClick: ((String) -> Unit)? = null,
     isAuthenticated: Boolean = false,
     onRequireSignIn: (() -> Unit)? = null,
     onDownloadClick: ((String) -> Unit)? = null,
@@ -210,6 +213,7 @@ fun ArticleDetailScreen(
                     saveError = saveState.error,
                     relatedState = relatedState,
                     onRelatedArticleClick = onRelatedArticleClick ?: {},
+                    onTagClick = onTagClick,
                     onOpenDownload = openDownload,
                     onOpenVideo = openVideo,
                 )
@@ -224,7 +228,7 @@ private fun VideoPreviewCard(
     onOpen: (String) -> Unit,
 ) {
     val url = video.url?.trim().orEmpty()
-    if (!isSafeVideoUrl(url)) return
+    if (!VideoUrlPolicy.isSafe(url)) return
 
     Surface(
         shape = RoundedCornerShape(TechVisionRadii.Lg),
@@ -299,11 +303,7 @@ private fun RelatedArticlesSection(
     }
 }
 
-private fun isSafeVideoUrl(url: String): Boolean {
-    val clean = url.trim()
-    if (clean.isEmpty()) return false
-    return clean.startsWith("https://") || clean.startsWith("http://")
-}
+
 
 /**
  * Opens a pre-validated `http(s)` URL in the system browser, guarding against
@@ -365,7 +365,16 @@ private fun SoftwareDownloadCard(
 ) {
     val name = software.name.trim()
     if (name.isEmpty()) return
-    val downloadUrl = DownloadUrlPolicy.normalize(software.downloadUrl)
+
+    // All reachable download targets the backend exposes, each independently
+    // gated by the HTTPS-only policy. External URL first (preserves the
+    // original single-link behaviour), then the storage-hosted file when
+    // present. Invalid/missing/unsafe values drop out here and are never
+    // rendered as clickable.
+    val targets = listOfNotNull(
+        DownloadUrlPolicy.normalize(software.downloadUrl),
+        DownloadUrlPolicy.normalize(software.fileUrl),
+    ).distinct()
 
     Surface(
         shape = RoundedCornerShape(TechVisionRadii.Lg),
@@ -400,30 +409,45 @@ private fun SoftwareDownloadCard(
                 }
             }
 
-            // External downloads are the only supported flow: the link is
+            // External downloads are the only supported flow: every link is
             // validated as http(s) before it is handed to the system browser.
             // The backend does not expose whether a download requires
             // authentication, so the card never presents an auth prompt — the
             // download behaves exactly like reading the article (public).
-            if (downloadUrl != null) {
-                TechGradientButton(
-                    text = stringResource(R.string.download),
-                    onClick = { onOpenDownload(downloadUrl) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("software_download"),
-                )
-                Text(
-                    text = stringResource(R.string.software_opens_external),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
+            if (targets.isEmpty()) {
                 Text(
                     text = stringResource(R.string.software_unavailable),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            } else {
+                targets.forEachIndexed { index, url ->
+                    if (index == 0) {
+                        TechGradientButton(
+                            text = stringResource(R.string.download),
+                            onClick = { onOpenDownload(url) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("software_download"),
+                        )
+                        Text(
+                            text = stringResource(R.string.software_opens_external),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        // A direct/storage download target alongside the external
+                        // URL: rendered as an extra validated button so the user
+                        // can reach every valid download the backend exposes.
+                        TechGradientButton(
+                            text = url,
+                            onClick = { onOpenDownload(url) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("software_download_file"),
+                        )
+                    }
+                }
             }
         }
     }
@@ -436,6 +460,7 @@ private fun ArticleDetailContent(
     saveError: AuthError?,
     relatedState: UiState<List<ArticleCardModel>>,
     onRelatedArticleClick: (String) -> Unit,
+    onTagClick: ((String) -> Unit)?,
     onOpenDownload: (String) -> Unit,
     onOpenVideo: (String) -> Unit,
 ) {
@@ -486,6 +511,49 @@ private fun ArticleDetailContent(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
+
+        // Compact author identity: a ringed avatar when the backend provides a
+        // valid HTTPS URL and a short bio when present, both rendered only with
+        // data the article already carries. Without either, nothing is shown and
+        // the screen falls back to the plain author-name metadata pill below.
+        article.author?.let { author ->
+            val avatarUrl = author.avatarUrl?.takeIf { it.startsWith("https://") }
+            val bio = author.bio?.takeIf { it.isNotBlank() }
+            if (avatarUrl != null || bio != null) {
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    avatarUrl?.let { url ->
+                        AsyncImage(
+                            model = url,
+                            contentDescription = author.name,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            placeholder = ColorPainter(placeholderColor),
+                            error = ColorPainter(placeholderColor),
+                        )
+                        Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = author.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                        bio?.let { text ->
+                            Text(
+                                text = text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+            }
+        }
 
         val meta = buildList {
             article.author?.name?.takeIf { it.isNotBlank() }?.let(::add)
@@ -547,7 +615,7 @@ private fun ArticleDetailContent(
             )
         }
 
-        article.video?.takeIf { it.url?.let(::isSafeVideoUrl) == true }?.let { video ->
+        article.video?.takeIf { VideoUrlPolicy.isSafe(it.url) }?.let { video ->
             Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
             VideoPreviewCard(video = video, onOpen = onOpenVideo)
         }
@@ -560,6 +628,8 @@ private fun ArticleDetailContent(
             ) {
                 article.tags.forEach { tag ->
                     Surface(
+                        onClick = { onTagClick?.invoke(tag.slug) },
+                        enabled = onTagClick != null,
                         shape = TechVisionRadii.Full,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

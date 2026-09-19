@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.navigation.AppNavHost
+import com.techvisiondz.app.core.navigation.DeepLinkTarget
 import com.techvisiondz.app.core.ui.ProvideAppLanguage
 import com.techvisiondz.app.core.settings.ThemeMode
 import com.techvisiondz.app.feature.settings.SettingsViewModel
@@ -34,6 +35,7 @@ import com.techvisiondz.app.ui.theme.TechVisionDzTheme
 @Composable
 fun TechVisionDzApp(
     settingsViewModel: SettingsViewModel? = null,
+    deepLinkTarget: DeepLinkTarget? = null,
 ) {
     val effectiveSettingsViewModel =
         settingsViewModel ?: viewModel(factory = SettingsViewModel.Factory)
@@ -58,6 +60,7 @@ fun TechVisionDzApp(
             AppNavHost(
                 updateViewModel = updateViewModel,
                 settingsViewModel = effectiveSettingsViewModel,
+                deepLinkTarget = deepLinkTarget,
             )
 
             UpdateDialogHost(updateViewModel = updateViewModel)

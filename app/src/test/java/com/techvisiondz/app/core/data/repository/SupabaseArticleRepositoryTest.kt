@@ -65,6 +65,37 @@ class SupabaseArticleRepositoryTest {
     }
 
     @Test
+    fun `storage download object maps to software file url`() {
+        val body = withDownloadBody("uploads/toolbar-v2.4.apk", "uploads")
+
+        val doc = decode(body) { json.decodeFromString(ArticleRpcDoc.serializer(), body) }
+        assertNotNull(doc)
+
+        val article = doc!!.toArticle("ar") { _, path -> "https://cdn.example/object/$path" }
+        assertNotNull(article)
+
+        val software = checkNotNull(article!!.software)
+        assertEquals("شريط أدوات", software.name)
+        assertEquals("2.4", software.version)
+        assertEquals("https://releases.example/toolbar-v2.4.apk", software.downloadUrl)
+        assertEquals("https://cdn.example/object/uploads/toolbar-v2.4.apk", software.fileUrl)
+    }
+
+    @Test
+    fun `storage download without bucket or path maps to null file url`() {
+        val body = withDownloadBody(null, null)
+
+        val doc = decode(body) { json.decodeFromString(ArticleRpcDoc.serializer(), body) }
+        assertNotNull(doc)
+
+        val article = doc!!.toArticle("ar") { _, path -> "https://cdn.example/object/$path" }
+        assertNotNull(article)
+
+        val software = checkNotNull(article!!.software)
+        assertNull(software.fileUrl)
+    }
+
+    @Test
     fun `malformed rpc body is not swallowed`() {
         val body = "{not valid json"
 
@@ -121,5 +152,47 @@ class SupabaseArticleRepositoryTest {
                 "download": null
             }
         """
+
+        /**
+         * The valid RPC body with a software callout plus a storage-backed
+         * `download` block describing the actual artifact.
+         */
+        private fun withDownloadBody(storagePath: String?, bucket: String?): String = """
+            {
+                "id": "article-1",
+                "status": "published",
+                "featured": true,
+                "published_at": "2026-08-01T09:00:00Z",
+                "reading_time_minutes": 5,
+                "views_count": 123,
+                "author_id": "author-1",
+                "category_id": "category-1",
+                "translation": {
+                    "language_code": "ar",
+                    "title": "عنوان المقال",
+                    "slug": "example-slug",
+                    "excerpt": "مقتطف قصير",
+                    "body": "<p>body</p>"
+                },
+                "author": { "name": "مؤلف", "bio": null },
+                "category": { "slug": "tech", "name": "تقنية" },
+                "tags": [],
+                "cover": null,
+                "video": null,
+                "software": {
+                    "name": "شريط أدوات",
+                    "version": "2.4",
+                    "download_url": "https://releases.example/toolbar-v2.4.apk"
+                },
+                "download": {
+                    "original_name": "toolbar-v2.4.apk",
+                    "storage_path": ${jsonValue(storagePath)},
+                    "bucket": ${jsonValue(bucket)}
+                }
+            }
+        """.trimIndent()
+
+        private fun jsonValue(value: String?): String =
+            value?.let { "\"$it\"" } ?: "null"
     }
 }
