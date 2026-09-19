@@ -20,6 +20,11 @@ class UpdateHostPolicyTest {
     }
 
     @Test
+    fun `release assets githubusercontent https url is trusted`() {
+        assertTrue(UpdateHostPolicy.isTrustedUrl("https://release-assets.githubusercontent.com/github-production-release-asset/app.apk"))
+    }
+
+    @Test
     fun `explicit default https port is trusted`() {
         assertTrue(UpdateHostPolicy.isTrustedUrl("https://github.com:443/nnou64396/tech-vision-dz-android/releases/latest/download/update-manifest.json"))
     }

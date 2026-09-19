@@ -12,6 +12,8 @@ import java.net.URL
  *  - `objects.githubusercontent.com` — the GitHub host that actually serves
  *    release assets after the redirect, allowed narrowly so the manifest
  *    cannot redirect the app to an arbitrary download host.
+ *  - `release-assets.githubusercontent.com` — GitHub's current release asset
+ *    delivery host for the same redirect flow.
  *
  * URLs are parsed with [URL] and compared by exact host, never by string
  * prefixes, so look-alike hosts (e.g. `github.com.evil.example`) are rejected.
@@ -24,6 +26,7 @@ object UpdateHostPolicy {
     val trustedHosts: Set<String> = setOf(
         "github.com",
         "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
     )
 
     /**

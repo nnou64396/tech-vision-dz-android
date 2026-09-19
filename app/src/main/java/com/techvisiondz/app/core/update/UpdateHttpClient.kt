@@ -32,7 +32,7 @@ internal class UnsuccessfulUpdateResponse(
  * Shared HTTP plumbing for the temporary updater.
  *
  * All updater traffic is HTTPS-only. Redirects (e.g. the GitHub release
- * `latest/download` hop to `objects.githubusercontent.com`) are allowed only
+ * `latest/download` hop to a trusted GitHub asset host) are allowed only
  * because a network interceptor validates the scheme and host of *every*
  * request OkHttp performs — including each redirect target — against
  * [UpdateHostPolicy]. A malicious or compromised manifest therefore cannot
