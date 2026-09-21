@@ -192,7 +192,7 @@ jobs:
             echo "   These public values are embedded in the APK; a release built without them is broken."
             exit 1
           }
-          printf 'SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\nARTICLE_BASE_URL=%s\n' \
+          printf 'TECHVISION_SUPABASE_URL=%s\nTECHVISION_SUPABASE_ANON_KEY=%s\nTECHVISION_ARTICLE_BASE_URL=%s\n' \
             "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$ARTICLE_BASE_URL" \
             > local.properties
           echo "local.properties written from repository variables (public values, size $(stat -c%s local.properties)B)."
