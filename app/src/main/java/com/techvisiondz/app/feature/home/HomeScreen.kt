@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.techvisiondz.app.R
@@ -47,6 +48,7 @@ import com.techvisiondz.app.core.ui.components.ArticleList
 import com.techvisiondz.app.core.ui.components.BrandMark
 import com.techvisiondz.app.core.ui.components.EmptyState
 import com.techvisiondz.app.core.ui.components.ErrorState
+import com.techvisiondz.app.core.ui.components.FennecMascot
 import com.techvisiondz.app.core.ui.components.LoadingState
 import com.techvisiondz.app.core.ui.components.SectionHeader
 import com.techvisiondz.app.ui.theme.TechVisionRadii
@@ -166,6 +168,10 @@ private fun HomeHeader(
                 .padding(bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The website's brand header pairs the fennec mascot with the
+            // wordmark; the Home header mirrors that exact branding.
+            FennecMascot()
+            Spacer(modifier = Modifier.width(TechVisionSpacing.Sm))
             BrandMark(size = 36.dp)
             Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
             Column(modifier = Modifier.weight(1f)) {
@@ -173,6 +179,8 @@ private fun HomeHeader(
                     text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = stringResource(R.string.home_tagline),

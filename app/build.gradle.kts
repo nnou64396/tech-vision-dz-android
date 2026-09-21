@@ -75,7 +75,7 @@ android {
 
     buildTypes {
         debug {
-            // Debug configuration can differ from release if desired.
+            applicationIdSuffix = ".debug"
         }
         release {
             if (keystorePropertiesFile.exists()) {
