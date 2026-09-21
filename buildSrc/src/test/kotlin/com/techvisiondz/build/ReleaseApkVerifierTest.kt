@@ -49,6 +49,27 @@ class ReleaseApkVerifierTest {
         assertTrue(result.failures.joinToString("\n") { it.render() }, result.passed)
     }
 
+    // Build Tools 37 renamed the apksigner signer label from "Signer #1 ..." to
+    // "V2 Signer: ...". The digest value is identical; the parser must be tolerant.
+    private val buildTools37Certs = """
+        V2 Signer: certificate DN: CN=TECH VISION DZ, OU=Android, O=TECH VISION DZ, C=DZ
+        V2 Signer: certificate SHA-256 digest: 1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33
+        V2 Signer: certificate SHA-1 digest: 24c967e2b4f66d32c61aeedf9afe2a51e7a24609
+        V2 Signer: certificate MD5 digest: 1e4dd176598d67c0e1e692895f1f7eda
+    """.trimIndent()
+
+    @Test
+    fun `build tools 37 apksigner output passes every check`() {
+        val result = ReleaseApkVerifier.verify(
+            expected = expected,
+            apkSha256 = dummySha256,
+            badgingOutput = realBadging,
+            apksignerOutput = buildTools37Certs,
+            apksignerExitOk = true,
+        )
+        assertTrue(result.failures.joinToString("\n") { it.render() }, result.passed)
+    }
+
     // --- Permission (the critical v1.1.2 regression) -------------------------
 
     @Test
@@ -108,16 +129,20 @@ class ReleaseApkVerifierTest {
 
     @Test
     fun `no certificate digest found fails the build`() {
+        val apksignerWithoutDigest = "Signer #1 certificate DN: CN=Unknown\n"
         val result = ReleaseApkVerifier.verify(
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
-            apksignerOutput = "Signer #1 certificate DN: CN=Unknown\n",
+            apksignerOutput = apksignerWithoutDigest,
             apksignerExitOk = true,
         )
 
         assertFalse(result.passed)
         assertEquals("Release APK signing certificate", result.failures.single().check)
+        // Diagnostics include a safe excerpt of the apksigner output.
+        assertTrue(result.failures.single().actual.contains("no certificate digest found"))
+        assertTrue(result.failures.single().actual.contains("CN=Unknown"))
     }
 
     // --- Application id / version -------------------------------------------
@@ -223,6 +248,71 @@ class ReleaseApkVerifierTest {
             "1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33",
             ReleaseApkVerifier.parseFirstSignerSha256(realApksigner),
         )
+    }
+
+    @Test
+    fun `parseFirstSignerSha256 extracts the digest from build tools 37 label`() {
+        assertEquals(
+            "1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33",
+            ReleaseApkVerifier.parseFirstSignerSha256(buildTools37Certs),
+        )
+    }
+
+    @Test
+    fun `parseFirstSignerSha256 returns null for unrelated sha256 text`() {
+        val unrelated = """
+            Signer #1 public key SHA-256 digest: 1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33
+            APK SHA-256: 1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33
+            Signer #1 certificate SHA-1 digest: 24c967e2b4f66d32c61aeedf9afe2a51e7a24609
+            Verified using v2 scheme (APK Signature Scheme v2): true
+        """.trimIndent()
+        assertEquals(null, ReleaseApkVerifier.parseFirstSignerSha256(unrelated))
+    }
+
+    @Test
+    fun `parseFirstSignerSha256 rejects malformed digest values`() {
+        val realDigest = "1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33"
+        val malformed = listOf(
+            "Signer #1 certificate SHA-256 digest: not-a-hex-digest",
+            "Signer #1 certificate SHA-256 digest: ${realDigest.dropLast(1)}",
+            "Signer #1 certificate SHA-256 digest: ${realDigest + "1"}",
+            "V2 Signer: certificate SHA-256 digest: Zfbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33",
+            "Signer #1 certificate SHA-256 digest: $realDigest $realDigest",
+            "Signer #1 certificate SHA-256 digest: $realDigest trailing-junk",
+        )
+        for (output in malformed) {
+            assertEquals("expected null for: $output", null, ReleaseApkVerifier.parseFirstSignerSha256(output))
+        }
+    }
+
+    @Test
+    fun `parseFirstSignerSha256 normalizes an uppercase digest to lowercase`() {
+        val uppercase = realApksigner.replace(
+            "1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33",
+            "1FBF843195367E3895D1BB614481F7A3D7F0DB1DA8FFE69EBA3CE4716BE20D33",
+        )
+        assertEquals(
+            "1fbf843195367e3895d1bb614481f7a3d7f0db1da8ffe69eba3ce4716be20d33",
+            ReleaseApkVerifier.parseFirstSignerSha256(uppercase),
+        )
+    }
+
+    @Test
+    fun `malformed certificate digest fails the build with output excerpt`() {
+        val malformed = "V2 Signer: certificate DN: CN=TECH VISION DZ, OU=Android, O=TECH VISION DZ, C=DZ\n" +
+            "V2 Signer: certificate SHA-256 digest: not-a-hex-digest\n"
+        val result = ReleaseApkVerifier.verify(
+            expected = expected,
+            apkSha256 = dummySha256,
+            badgingOutput = realBadging,
+            apksignerOutput = malformed,
+            apksignerExitOk = true,
+        )
+
+        assertFalse(result.passed)
+        assertEquals("Release APK signing certificate", result.failures.single().check)
+        assertTrue(result.failures.single().actual.contains("no certificate digest found"))
+        assertTrue(result.failures.single().actual.contains("V2 Signer: certificate SHA-256 digest: not-a-hex-digest"))
     }
 
     // --- SHA-256 ------------------------------------------------------------

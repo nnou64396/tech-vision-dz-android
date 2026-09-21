@@ -136,8 +136,8 @@ object ReleaseApkVerifier {
             if (certificateSha256 == null) {
                 failures += CheckFailure(
                     check = "Release APK signing certificate",
-                    expected = "Signer #1 SHA-256 digest in apksigner output",
-                    actual = "no certificate digest found",
+                    expected = "a 64-char hex certificate SHA-256 digest in apksigner output",
+                    actual = "no certificate digest found" + apksignerOutputExcerpt(apksignerOutput),
                     fix = "The APK is signed but its certificate could not be read; verify the APK was packaged by AGP.",
                 )
             } else if (certificateSha256 != expected.certificateSha256.lowercase()) {
@@ -170,14 +170,29 @@ object ReleaseApkVerifier {
         return ApkInfo(applicationId, versionCode, versionName, permissions)
     }
 
-    /** First Signer #1 (v2/v3) certificate SHA-256 from `apksigner verify --print-certs` output. */
+    /**
+     * First certificate SHA-256 digest from `apksigner verify --print-certs` output.
+     *
+     * The signer label varies across Build Tools releases:
+     *   Build Tools 36: "Signer #1 certificate SHA-256 digest: <hex>"
+     *   Build Tools 37: "V2 Signer: certificate SHA-256 digest: <hex>"
+     * The digest value itself is identical either way, so only the
+     * `certificate SHA-256 digest:` marker and the trailing 64-char hex value are
+     * matched here, keeping the parser tolerant of future label changes.
+     *
+     * Returns null when no line carries a valid 64-char hex certificate SHA-256
+     * digest. Unrelated SHA-256 text (e.g. public-key, SHA-1, MD5, or APK digests)
+     * is deliberately not accepted.
+     */
     fun parseFirstSignerSha256(output: String): String? =
         output.lineSequence()
-            .map { it.trim() }
-            .firstOrNull { it.startsWith("Signer #1 certificate SHA-256 digest:") }
-            ?.substringAfter("digest:")
-            ?.trim()
-            ?.lowercase()
+            .mapNotNull { line ->
+                certificateSha256DigestRegex.find(line.trim())?.groupValues?.getOrNull(1)?.lowercase()
+            }
+            .firstOrNull()
+
+    private val certificateSha256DigestRegex =
+        Regex("""certificate SHA-256 digest:\s*([0-9A-Fa-f]{64})\s*$""")
 
     fun sha256(file: File): String =
         file.inputStream().use { input -> sha256(input.readBytes()) }
@@ -186,6 +201,20 @@ object ReleaseApkVerifier {
         MessageDigest.getInstance("SHA-256")
             .digest(bytes)
             .joinToString("") { "%02x".format(it) }
+
+    /**
+     * Small safe excerpt of `apksigner` output (first 10 non-empty lines) for
+     * failure diagnostics. apksigner only prints public certificate data, but the
+     * excerpt is kept tiny so secrets could never leak through it.
+     */
+    private fun apksignerOutputExcerpt(output: String): String {
+        val lines = output.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .take(10)
+            .joinToString("\n  ")
+        return if (lines.isNotEmpty()) "\n  apksigner output:\n  $lines" else ""
+    }
 
     private fun parseQuotedValues(line: String): Map<String, String> {
         val values = mutableMapOf<String, String>()
