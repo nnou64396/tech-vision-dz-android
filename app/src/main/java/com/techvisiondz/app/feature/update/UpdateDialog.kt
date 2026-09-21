@@ -72,6 +72,7 @@ fun UpdateDialog(
                         stringResource(R.string.update_permission_required)
                     UpdateUiState.InstallerLaunched -> stringResource(R.string.update_installing)
                     UpdateUiState.Cancelled -> stringResource(R.string.update_cancelled)
+                    is UpdateUiState.InstallerError -> stringResource(R.string.update_install_error)
                     else -> ""
                 },
                 style = MaterialTheme.typography.titleLarge,
@@ -107,6 +108,11 @@ fun UpdateDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                is UpdateUiState.InstallerError -> Text(
+                    text = stringResource(state.messageRes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 else -> Unit
             }
         },
@@ -124,6 +130,9 @@ fun UpdateDialog(
                 UpdateUiState.InstallerLaunched,
                 UpdateUiState.Cancelled -> TextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.update_done))
+                }
+                is UpdateUiState.InstallerError -> TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.update_dismiss))
                 }
                 else -> Unit
             }

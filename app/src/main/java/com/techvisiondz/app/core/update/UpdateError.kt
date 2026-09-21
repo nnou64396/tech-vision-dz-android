@@ -39,8 +39,11 @@ sealed interface UpdateError {
     /** The downloaded APK's version does not match the manifest version. */
     data object WrongVersion : UpdateError
 
-    /** The app is not allowed to request package installations. */
+    /** The app is not allowed to request package installations (declared but denied). */
     data object InstallationPermissionRequired : UpdateError
+
+    /** This APK does not declare the permission to install packages; not fixable in place. */
+    data object PermissionNotDeclared : UpdateError
 
     /** Android's system package installer could not be launched. */
     data object InstallerLaunch : UpdateError

@@ -155,5 +155,8 @@
     <string name="update_error_verify">تعذر التحقق من التحديث الذي تم تنزيله وسيتم تجاهله.</string>
     <string name="update_error_launch">تعذر على Android فتح المثبّت. حاول مرة أخرى.</string>
     <string name="update_error_permission">يتطلب تثبيت التحديثات إذناً من Android.</string>
+    <string name="update_error_permission_not_declared">لا يمكن لهذا الإصدار من التطبيق تثبيت التحديثات بنفسه. يرجى تنزيل أحدث نسخة APK من صفحة إصدارات TECH VISION DZ الرسمية وفتحها لتثبيتها يدويًا.</string>
+    <string name="update_install_error">فشل تثبيت التحديث</string>
+    <string name="update_dismiss">إغلاق</string>
     <string name="update_error_cancelled">تم إلغاء التحديث.</string>
 </resources>

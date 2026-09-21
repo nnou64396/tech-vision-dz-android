@@ -131,6 +131,30 @@ class UpdateDialogTest {
     }
 
     @Test
+    fun installerErrorShowsMessageAndDismissInsteadOfClosingSilently() {
+        setDialog(state = UpdateUiState.InstallerError(R.string.update_error_launch))
+
+        composeRule.onNodeWithText(context.getString(R.string.update_error_launch)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.update_dismiss)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.update_install)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).assertDoesNotExist()
+        composeRule.onNodeWithText("Exception", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun installerErrorWithUndeclaredPermissionShowsManualInstallGuidance() {
+        setDialog(
+            state = UpdateUiState.InstallerError(R.string.update_error_permission_not_declared),
+        )
+
+        composeRule.onNodeWithText(
+            context.getString(R.string.update_error_permission_not_declared),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.update_dismiss)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.update_install)).assertDoesNotExist()
+    }
+
+    @Test
     fun clickingUpdateNowInvokesCallback() {
         var clicked = false
         setDialog(

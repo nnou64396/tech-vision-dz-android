@@ -115,16 +115,42 @@ class UpdateViewModelTest {
     }
 
     private class FakeUpdateInstaller : UpdateApkInstaller {
-        var canRequest = true
-        var launchResult: InstallLaunchResult = InstallLaunchResult.Launched
+        enum class PermissionState { Allowed, Denied, NotDeclared }
+
+        var permission: PermissionState = PermissionState.Allowed
+        var result: InstallLaunchResult = InstallLaunchResult.Launched
+
+        /**
+         * When set, [launchInstaller] throws this throwable before returning,
+         * modeling an unexpectedly failing installer implementation. This is
+         * how the historical v1.1.2 bug behaved: the real installer threw a
+         * SecurityException instead of returning a result.
+         */
+        var throwFromLaunch: Throwable? = null
         var lastApk: File? = null
-        override fun canRequestPackageInstalls(): Boolean = canRequest
+
+        override fun canRequestPackageInstalls(): Boolean = when (permission) {
+            PermissionState.Allowed -> true
+            PermissionState.Denied -> false
+            PermissionState.NotDeclared -> throw SecurityException(
+                "Need to declare android.permission.REQUEST_INSTALL_PACKAGES to call this api",
+            )
+        }
+
         override fun launchInstaller(apk: File): InstallLaunchResult {
             lastApk = apk
+            throwFromLaunch?.let { throw it }
             // Mirrors AndroidUpdateApkInstaller: the permission check short-circuits
-            // before anything is ever handed to the OS installer.
-            return if (canRequest) launchResult else InstallLaunchResult.PermissionRequired
+            // before anything is ever handed to the OS installer. "Permission not
+            // declared" is a distinct condition from "declared but denied", so it
+            // must never be reported as PermissionRequired.
+            return when (permission) {
+                PermissionState.Allowed -> result
+                PermissionState.Denied -> InstallLaunchResult.PermissionRequired
+                PermissionState.NotDeclared -> InstallLaunchResult.PermissionNotDeclared
+            }
         }
+
         override fun unknownAppSourcesSettingsIntent(): Intent = Intent()
     }
 
@@ -417,7 +443,7 @@ class UpdateViewModelTest {
     @Test
     fun `install requires permission when the source is not allowed`() = runTest(dispatcher) {
         val fetcher = FakeManifestFetcher(manifest = availableManifest())
-        val installer = FakeUpdateInstaller().apply { canRequest = false }
+        val installer = FakeUpdateInstaller().apply { permission = FakeUpdateInstaller.PermissionState.Denied }
         val viewModel = viewModel(fetcher, installer = installer)
 
         viewModel.checkForUpdate()
@@ -433,8 +459,8 @@ class UpdateViewModelTest {
     fun `install launches the system installer when permitted`() = runTest(dispatcher) {
         val fetcher = FakeManifestFetcher(manifest = availableManifest())
         val installer = FakeUpdateInstaller().apply {
-            canRequest = true
-            launchResult = InstallLaunchResult.Launched
+            permission = FakeUpdateInstaller.PermissionState.Allowed
+            result = InstallLaunchResult.Launched
         }
         val preferences = FakeUpdatePreferences()
         val viewModel = viewModel(fetcher, installer = installer, preferences = preferences)
@@ -453,9 +479,11 @@ class UpdateViewModelTest {
     }
 
     @Test
-    fun `install launch failure surfaces an error`() = runTest(dispatcher) {
+    fun `install launch failure surfaces a visible installer error`() = runTest(dispatcher) {
         val fetcher = FakeManifestFetcher(manifest = availableManifest())
-        val installer = FakeUpdateInstaller().apply { launchResult = InstallLaunchResult.LaunchFailed }
+        val installer = FakeUpdateInstaller().apply {
+            result = InstallLaunchResult.LaunchFailed
+        }
         val viewModel = viewModel(fetcher, installer = installer)
 
         viewModel.checkForUpdate()
@@ -464,7 +492,74 @@ class UpdateViewModelTest {
         advanceUntilIdle()
 
         viewModel.installUpdate()
-        assertEquals(UpdateUiState.Error(R.string.update_error_launch), viewModel.uiState.value)
+        assertEquals(UpdateUiState.InstallerError(R.string.update_error_launch), viewModel.uiState.value)
+    }
+
+    @Test
+    fun `install with undeclared permission surfaces a distinct visible error`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            permission = FakeUpdateInstaller.PermissionState.NotDeclared
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        assertEquals(UpdateUiState.ReadyToInstall, viewModel.uiState.value)
+
+        viewModel.installUpdate()
+
+        val state = viewModel.uiState.value
+        assertTrue(state is UpdateUiState.InstallerError)
+        assertEquals(
+            R.string.update_error_permission_not_declared,
+            (state as UpdateUiState.InstallerError).messageRes,
+        )
+    }
+
+    @Test
+    fun `security exception from the installer never silently stays ready to install`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            throwFromLaunch = SecurityException(
+                "Need to declare android.permission.REQUEST_INSTALL_PACKAGES to call this api",
+            )
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        assertEquals(UpdateUiState.ReadyToInstall, viewModel.uiState.value)
+
+        viewModel.installUpdate()
+
+        // Regression: the historical bug converted this exception to an
+        // UpdateError the result-when never matched, leaving the UI stuck in
+        // ReadyToInstall with zero state change. Any installer exception must
+        // now produce a deliberate, visible error state.
+        assertTrue(viewModel.uiState.value is UpdateUiState.InstallerError)
+        assertTrue(viewModel.uiState.value !is UpdateUiState.ReadyToInstall)
+    }
+
+    @Test
+    fun `unexpected installer exception surfaces a visible installer error`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            throwFromLaunch = IllegalStateException("boom")
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+
+        viewModel.installUpdate()
+        assertEquals(UpdateUiState.InstallerError(R.string.update_error_launch), viewModel.uiState.value)
     }
 
     @Test

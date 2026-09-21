@@ -67,6 +67,8 @@ fun UpdateCheckRow(
         UpdateUiState.Cancelled -> stringResource(R.string.update_cancelled) to RowAction.None
         is UpdateUiState.Error -> stringResource(state.messageRes) to
             RowAction.Button(stringResource(R.string.retry), onRetry)
+        is UpdateUiState.InstallerError -> stringResource(state.messageRes) to
+            RowAction.Button(stringResource(R.string.retry), onRetry)
     }
 
     Row(

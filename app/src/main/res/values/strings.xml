@@ -150,5 +150,8 @@
     <string name="update_error_verify">The downloaded update could not be verified and will be discarded.</string>
     <string name="update_error_launch">Android could not open the installer. Please try again.</string>
     <string name="update_error_permission">Installing updates requires permission from Android.</string>
+    <string name="update_error_permission_not_declared">This version of the app cannot install updates by itself. Download the latest APK from the official TECH VISION DZ release page and open it to install it manually.</string>
+    <string name="update_install_error">Update install failed</string>
+    <string name="update_dismiss">Dismiss</string>
     <string name="update_error_cancelled">Update cancelled.</string>
 </resources>

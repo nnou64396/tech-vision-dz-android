@@ -171,17 +171,24 @@ class UpdateViewModel(
         val result = try {
             installer.launchInstaller(apk)
         } catch (e: Exception) {
-            UpdateError.InstallerLaunch
+            // AndroidUpdateApkInstaller converts every framework outcome into an
+            // InstallLaunchResult and never throws, but an unexpected failure must
+            // still land on a visible state below instead of silently falling through.
+            InstallLaunchResult.LaunchFailed
         }
-        when (result) {
+        // Exhaustive: the compiler rejects a future InstallLaunchResult variant that
+        // has no deliberate state transition here.
+        _uiState.value = when (result) {
             InstallLaunchResult.Launched -> {
                 preferences.clear()
-                _uiState.value = UpdateUiState.InstallerLaunched
+                UpdateUiState.InstallerLaunched
             }
             InstallLaunchResult.PermissionRequired ->
-                _uiState.value = UpdateUiState.InstallationPermissionRequired
+                UpdateUiState.InstallationPermissionRequired
+            InstallLaunchResult.PermissionNotDeclared ->
+                UpdateUiState.InstallerError(updateErrorMessageRes(UpdateError.PermissionNotDeclared))
             InstallLaunchResult.LaunchFailed ->
-                _uiState.value = UpdateUiState.Error(updateErrorMessageRes(UpdateError.InstallerLaunch))
+                UpdateUiState.InstallerError(updateErrorMessageRes(UpdateError.InstallerLaunch))
         }
     }
 
@@ -279,6 +286,7 @@ class UpdateViewModel(
         UpdateError.WrongPackage,
         UpdateError.WrongVersion -> R.string.update_error_verify
         UpdateError.InstallationPermissionRequired -> R.string.update_error_permission
+        UpdateError.PermissionNotDeclared -> R.string.update_error_permission_not_declared
         UpdateError.InstallerLaunch -> R.string.update_error_launch
         UpdateError.Cancelled -> R.string.update_error_cancelled
     }

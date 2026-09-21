@@ -1,0 +1,377 @@
+# ============================================================================
+# Production Release CI — TECH VISION DZ Android
+#
+# Builds, signs, verifies, and publishes a production release APK together
+# with its update-manifest.json (the manifest the in-app updater consumes).
+#
+# Triggers:
+#   * push of a tag v*.*.*           -> THE ONLY production release path.
+#                                      Builds, verifies, and publishes the
+#                                      GitHub Release for that tag.
+#   * workflow_dispatch (manual)     -> SAFE DRY-RUN only. Runs the full
+#                                      validation/build/sign/verify/manifest
+#                                      pipeline for the supplied version but
+#                                      NEVER creates a git tag, never creates a
+#                                      GitHub Release, and never publishes.
+#
+# Because workflow_dispatch never creates a tag, it can never retrigger the
+# tag-triggered workflow. Tag push is the single source of production releases.
+#
+# Ordinary pushes to `main` never trigger a release.
+#
+# Required repository secrets (names only; values never leave GitHub):
+#   ANDROID_KEYSTORE_BASE64          base64 of the production signing keystore
+#   ANDROID_KEYSTORE_STORE_PASSWORD  keystore store password
+#   ANDROID_KEYSTORE_KEY_ALIAS       signing key alias
+#   ANDROID_KEYSTORE_KEY_PASSWORD    signing key password
+#
+# Required repository variables (PUBLIC, NON-SECRET client config embedded in
+# the release APK; configure under Settings > Secrets and variables > Actions):
+#   SUPABASE_URL                     Supabase REST endpoint
+#   SUPABASE_ANON_KEY                Supabase public anon key
+#   ARTICLE_BASE_URL                 public article website base for share URLs
+#
+# Security model:
+#   * secrets are injected only through step `env:` (never inline-expanded)
+#   * the keystore is decoded into $RUNNER_TEMP (ephemeral, outside the repo)
+#   * keystore.properties (repo-root file consumed by app/build.gradle.kts)
+#     is generated, is gitignored, and is deleted in a `if: always()` step
+#   * no secret value is ever echoed; no secret value appears in errors
+#   * the pinned production certificate digest is enforced by the project's
+#     own verifyReleaseApk task (Phase 2)
+#
+# The gate (identical for both triggers) is: tests pass -> version/tag
+# consistency -> signing -> assembleRelease -> verifyReleaseApk -> manifest
+# generated from THE VERIFIED APK -> manifest self-validated against the APK.
+# Only the tag-push trigger then proceeds to gh release; manual dispatch stops
+# after validation. A failure in any earlier step prevents anything downstream.
+# ============================================================================
+
+name: Production Release CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version to dry-run validate; must equal versionName in
+          app/build.gradle.kts (e.g. 1.1.4). Runs the full pipeline but creates
+          no git tag and no GitHub Release. Push tag v<version> to publish.
+        required: true
+        type: string
+      releaseNotes:
+        description: >-
+          Optional short release notes for the dry-run update-manifest.json
+          (validation only; never published). Production notes are the static
+          template used by the tag-push path.
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  # Minimum: read repo contents + create releases/tags. Only the tag-push
+  # publish step uses this; workflow_dispatch dry-run never publishes.
+  contents: write
+
+# Never run two production releases at once. A re-run for the same version
+# after a failure simply waits; nothing is cancelled mid-publish.
+concurrency:
+  group: tech-vision-dz-production-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Build, verify, and publish production release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ----------------------------------------------------------------------
+      # Version resolution
+      # ----------------------------------------------------------------------
+      - name: Resolve release version and tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release version '$VERSION' must be a semantic version X.Y.Z (e.g. 1.1.4)."
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Release version: v${VERSION} (trigger: ${{ github.event_name }}; publishes only on tag push)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ----------------------------------------------------------------------
+      # Tests before anything else; a failing test stops the workflow.
+      # ----------------------------------------------------------------------
+      - name: Run unit tests (app + buildSrc)
+        run: ./gradlew test :buildSrc:test --stacktrace
+
+      # ----------------------------------------------------------------------
+      # Git tag vs project version safety
+      # ----------------------------------------------------------------------
+      - name: Validate version/tag consistency
+        run: |
+          GRADLE_VERSION_NAME="$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)"
+          GRADLE_VERSION_CODE="$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)"
+          [ -n "$GRADLE_VERSION_NAME" ] || { echo "::error::versionName not found in app/build.gradle.kts."; exit 1; }
+          [ -n "$GRADLE_VERSION_CODE" ] || { echo "::error::versionCode not found in app/build.gradle.kts."; exit 1; }
+          echo "gradle: versionName=$GRADLE_VERSION_NAME versionCode=$GRADLE_VERSION_CODE"
+          if [ "$GRADLE_VERSION_NAME" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Release version does not match the Android project versionName."
+            echo "   what:   tag/release version"
+            echo "   expected: ${{ steps.version.outputs.version }}"
+            echo "   actual:   $GRADLE_VERSION_NAME"
+            echo "   fix:     bump versionName (and versionCode) in app/build.gradle.kts, commit, then push tag v$GRADLE_VERSION_NAME."
+            exit 1
+          fi
+          echo "versionName matches tag v${{ steps.version.outputs.version }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ----------------------------------------------------------------------
+      # Secure signing setup (no secrets printed or echoed)
+      # ----------------------------------------------------------------------
+      - name: Reconstruct production keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEYSTORE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_STORE_PASSWORD }}
+        run: |
+          set -u
+          [ -n "$KEYSTORE_B64" ] || { echo "::error::Missing secret ANDROID_KEYSTORE_BASE64. Configure repository secrets first."; exit 1; }
+          [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ] && [ -n "$STORE_PASSWORD" ] || {
+            echo "::error::Missing keystore secrets: ANDROID_KEYSTORE_KEY_ALIAS, ANDROID_KEYSTORE_KEY_PASSWORD, ANDROID_KEYSTORE_STORE_PASSWORD."
+            exit 1
+          }
+          STORE_PATH="${RUNNER_TEMP}/android-release.keystore"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$STORE_PATH"
+          [ -s "$STORE_PATH" ] || {
+            echo "::error::Failed to decode ANDROID_KEYSTORE_BASE64 into a non-empty keystore."
+            exit 1
+          }
+          # app/build.gradle.kts reads keystore.properties from the repo root.
+          # storeFile is absolute so it resolves regardless of the module dir.
+          printf 'keyAlias=%s\nkeyPassword=%s\nstoreFile=%s\nstorePassword=%s\n' \
+            "$KEY_ALIAS" "$KEY_PASSWORD" "$STORE_PATH" "$STORE_PASSWORD" \
+            > keystore.properties
+          echo "Signing keystore reconstructed into runner temp (values never printed)."
+
+      # Public client config (Supabase endpoint/anon key, article base URL)
+      # embedded in the release APK. Not secret credentials; sourced from
+      # GitHub Actions repository variables so the built app actually works.
+      - name: Write public client config (local.properties)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          ARTICLE_BASE_URL: ${{ vars.ARTICLE_BASE_URL }}
+        run: |
+          set -u
+          [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ] && [ -n "$ARTICLE_BASE_URL" ] || {
+            echo "::error::Missing repository variables: SUPABASE_URL, SUPABASE_ANON_KEY, ARTICLE_BASE_URL."
+            echo "   Configure them in GitHub Settings > Secrets and variables > Actions > Variables."
+            echo "   These public values are embedded in the APK; a release built without them is broken."
+            exit 1
+          }
+          printf 'SUPABASE_URL=%s\nSUPABASE_ANON_KEY=%s\nARTICLE_BASE_URL=%s\n' \
+            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "$ARTICLE_BASE_URL" \
+            > local.properties
+          echo "local.properties written from repository variables (public values, size $(stat -c%s local.properties)B)."
+
+      # ----------------------------------------------------------------------
+      # Build + verify the final signed APK
+      # ----------------------------------------------------------------------
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      # verifyReleaseApk (Phase 2) inspects the FINAL APK produced by this
+      # exact build: applicationId, versionCode/versionName, REQUEST_INSTALL_PACKAGES,
+      # production certificate, signature/structure, SHA-256. It depends on
+      # assembleRelease, so the verified file is always the freshly built one.
+      - name: Verify final signed release APK
+        run: ./gradlew :app:verifyReleaseApk --stacktrace
+
+      - name: Resolve verified APK metadata
+        run: |
+          APK_DIR="app/build/outputs/apk/release"
+          APK_FILES=("$APK_DIR"/*.apk)
+          [ "${#APK_FILES[@]}" -eq 1 ] || {
+            echo "::error::Expected exactly one release APK in $APK_DIR, found ${#APK_FILES[@]}."
+            ls -la "$APK_DIR"
+            exit 1
+          }
+          APK_PATH="${APK_FILES[0]}"
+          [ -f "$APK_PATH" ] || { echo "::error::Verified APK not found at '$APK_PATH'."; exit 1; }
+
+          AAPT2="$(ls -1 "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)"
+          [ -n "$AAPT2" ] || { echo "::error::aapt2 not found under \$ANDROID_HOME/build-tools."; exit 1; }
+          BADGING="$("$AAPT2" dump badging "$APK_PATH")"
+          APK_VERSION_CODE="$(grep -oP "versionCode='\K[0-9]+" <<< "$BADGING" | head -1)"
+          APK_VERSION_NAME="$(grep -oP "versionName='\K[^']+" <<< "$BADGING" | head -1)"
+          [ -n "$APK_VERSION_CODE" ] || { echo "::error::Could not read versionCode from the APK."; exit 1; }
+          [ -n "$APK_VERSION_NAME" ] || { echo "::error::Could not read versionName from the APK."; exit 1; }
+
+          APK_SHA256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
+          APK_FILE_SIZE="$(stat -c%s "$APK_PATH")"
+
+          {
+            echo "APK_PATH=$APK_PATH"
+            echo "APK_VERSION_CODE=$APK_VERSION_CODE"
+            echo "APK_VERSION_NAME=$APK_VERSION_NAME"
+            echo "APK_SHA256=$APK_SHA256"
+            echo "APK_FILE_SIZE=$APK_FILE_SIZE"
+            echo "RELEASE_VERSION=${{ steps.version.outputs.version }}"
+            echo "RELEASE_TAG=${{ steps.version.outputs.release_tag }}"
+          } >> "$GITHUB_ENV"
+
+          echo "Verified artifact: $APK_PATH" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "versionName=$APK_VERSION_NAME versionCode=$APK_VERSION_CODE size=${APK_FILE_SIZE}B" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "APK SHA-256=$APK_SHA256" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ----------------------------------------------------------------------
+      # Version monotonicity: must be newer than the previous production release
+      # ----------------------------------------------------------------------
+      - name: Ensure versionCode is newer than the previous production release
+        run: |
+          PREV_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/update-manifest.json"
+          if PREV="$(curl -sf --max-time 30 "$PREV_URL")"; then
+            PREV_VC="$(jq -r '.versionCode // empty' <<< "$PREV")"
+            if [ -n "$PREV_VC" ] && [ "$APK_VERSION_CODE" -le "$PREV_VC" ]; then
+              echo "::error::APK versionCode $APK_VERSION_CODE is not greater than the previous production versionCode $PREV_VC."
+              echo "   what:    versionCode monotonicity"
+              echo "   expected: > $PREV_VC"
+              echo "   actual:   $APK_VERSION_CODE"
+              echo "   fix:     increase versionCode in app/build.gradle.kts."
+              exit 1
+            fi
+            echo "previous production versionCode=$PREV_VC -> current $APK_VERSION_CODE (newer)" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "PREV_VERSION_CODE=$PREV_VC" >> "$GITHUB_ENV"
+          else
+            echo "No reachable previous production manifest; skipping monotonicity check (first CI release)." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ----------------------------------------------------------------------
+      # Generate update-manifest.json from the VERIFIED APK (schema matches
+      # core/update/UpdateManifest.kt exactly; no fileSize field).
+      # ----------------------------------------------------------------------
+      - name: Generate update-manifest.json
+        env:
+          RELEASE_NOTES_INPUT: ${{ inputs.releaseNotes }}
+        run: |
+          DOWNLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/app-release.apk"
+          jq -n \
+            --argjson versionCode "$APK_VERSION_CODE" \
+            --arg versionName "$APK_VERSION_NAME" \
+            --arg downloadUrl "$DOWNLOAD_URL" \
+            --arg sha256 "$APK_SHA256" \
+            '{versionCode: $versionCode, versionName: $versionName, downloadUrl: $downloadUrl, sha256: $sha256}' \
+            > update-manifest.json
+          if [ -n "${PREV_VERSION_CODE:-}" ]; then
+            jq --argjson minimumVersionCode "$PREV_VERSION_CODE" '. + {minimumVersionCode: $minimumVersionCode}' update-manifest.json > tmp-manifest.json && mv tmp-manifest.json update-manifest.json
+          fi
+          RELEASE_NOTES="$RELEASE_NOTES_INPUT"
+          if [ -n "$RELEASE_NOTES" ]; then
+            jq --arg releaseNotes "$RELEASE_NOTES" '. + {releaseNotes: $releaseNotes}' update-manifest.json > tmp-manifest.json && mv tmp-manifest.json update-manifest.json
+          fi
+          jq . update-manifest.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ----------------------------------------------------------------------
+      # Manifest self-validation (mirrors UpdateManifestValidator, no weakening)
+      # ----------------------------------------------------------------------
+      - name: Validate generated update-manifest.json
+        run: |
+          jq -e . update-manifest.json >/dev/null || { echo "::error::update-manifest.json is not valid JSON."; exit 1; }
+
+          M_VC="$(jq -r '.versionCode' update-manifest.json)"
+          M_VN="$(jq -r '.versionName' update-manifest.json)"
+          M_SHA="$(jq -r '.sha256' update-manifest.json)"
+          M_URL="$(jq -r '.downloadUrl' update-manifest.json)"
+          M_MIN="$(jq -r '.minimumVersionCode // empty' update-manifest.json)"
+
+          [ "$M_VC" -gt 0 ] 2>/dev/null || { echo "::error::update-manifest.json versionCode must be > 0 (got '$M_VC')."; exit 1; }
+          [ -n "$M_VN" ] || { echo "::error::update-manifest.json versionName is blank."; exit 1; }
+          [[ "$M_SHA" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::update-manifest.json sha256 is not 64 lowercase hex chars."; exit 1; }
+          if [ -n "$M_MIN" ]; then
+            [ "$M_MIN" -gt 0 ] && [ "$M_MIN" -le "$M_VC" ] || {
+              echo "::error::update-manifest.json minimumVersionCode '$M_MIN' must be > 0 and <= versionCode '$M_VC'."
+              exit 1
+            }
+          fi
+          # Trusted-host policy: exact platform URL, HTTPS, github.com only.
+          EXPECTED_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/app-release.apk"
+          [ "$M_URL" = "$EXPECTED_URL" ] || {
+            echo "::error::update-manifest.json downloadUrl '$M_URL' does not equal the expected release asset URL '$EXPECTED_URL'."
+            exit 1
+          }
+
+          # The manifest must describe the exact verified APK, nothing else.
+          [ "$M_VC" = "$APK_VERSION_CODE" ] || { echo "::error::Manifest versionCode '$M_VC' != APK versionCode '$APK_VERSION_CODE'."; exit 1; }
+          [ "$M_VN" = "$APK_VERSION_NAME" ] || { echo "::error::Manifest versionName '$M_VN' != APK versionName '$APK_VERSION_NAME'."; exit 1; }
+          [ "$M_VN" = "$RELEASE_VERSION" ] || { echo "::error::Manifest versionName '$M_VN' != release version '$RELEASE_VERSION'."; exit 1; }
+          # SHA-256 of the manifest MUST equal the SHA-256 of the uploaded APK.
+          [ "$M_SHA" = "$APK_SHA256" ] || {
+            echo "::error::update-manifest.json sha256 '$M_SHA' != APK sha256 '$APK_SHA256'."
+            exit 1
+          }
+
+          echo "update-manifest.json validated (versionCode/versionName/sha256/downloadUrl/minimumVersionCode ok)." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ----------------------------------------------------------------------
+      # Publish — TAG PUSH ONLY. Guarded by `github.event_name == 'push'`, so a
+      # workflow_dispatch dry-run can never create a GitHub Release (and never
+      # calls gh release create, which additionally means it never invents a
+      # git tag). On a tag push the tag already exists, so this path never
+      # creates a tag either. gh release create fails safely if the release
+      # already exists for this tag.
+      # ----------------------------------------------------------------------
+      - name: Publish GitHub Release (tag push only)
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Automated production release of TECH VISION DZ Android ${RELEASE_VERSION}."
+          gh release create "${RELEASE_TAG}" \
+            "${APK_PATH}" "update-manifest.json" \
+            --title "TECH VISION DZ Android ${RELEASE_TAG}" \
+            --notes "${NOTES}" \
+            --repo "${GITHUB_REPOSITORY}"
+          echo "Published ${RELEASE_TAG} with assets: app-release.apk, update-manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Manual dispatch is a SAFE DRY-RUN: the full pipeline above succeeded,
+      # but no git tag and no GitHub Release were created and nothing published.
+      - name: Dry-run complete (no tag, no release, no publish)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Manual dry-run PASSED for v${RELEASE_VERSION}." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "No git tag was created, no GitHub Release was created, nothing was published." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "To publish this version: commit the version bump, then push tag v${RELEASE_VERSION}." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # ----------------------------------------------------------------------
+      # Best-effort cleanup of signing material, even on failure.
+      # ----------------------------------------------------------------------
+      - name: Clean up signing material
+        if: always()
+        run: |
+          rm -f keystore.properties local.properties "${RUNNER_TEMP}/android-release.keystore"

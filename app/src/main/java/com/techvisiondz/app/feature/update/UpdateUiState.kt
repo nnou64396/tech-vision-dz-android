@@ -6,7 +6,8 @@ package com.techvisiondz.app.feature.update
  *
  * The flow is: [Idle] → [Checking] → ([NoUpdate] | [UpdateAvailable] |
  * [Error]) → [Downloading] → [Verifying] → [ReadyToInstall] →
- * ([InstallationPermissionRequired] | [InstallerLaunched] | [Error]).
+ * ([InstallationPermissionRequired] | [InstallerLaunched] | [Error] |
+ * [InstallerError]).
  * [Cancelled] is reached only via an explicit user cancel of a download.
  */
 sealed interface UpdateUiState {
@@ -49,6 +50,13 @@ sealed interface UpdateUiState {
      * no URLs, paths, versions, or exception details are ever exposed.
      */
     data class Error(val messageRes: Int) : UpdateUiState
+
+    /**
+     * An installer-stage failure. Unlike check-stage [Error] (shown in the
+     * update row), this remains a visible dialog state so a failure after the
+     * user pressed Install can never disappear silently.
+     */
+    data class InstallerError(val messageRes: Int) : UpdateUiState
 }
 
 /**
@@ -63,7 +71,8 @@ fun UpdateUiState.shouldShowDialog(): Boolean = when (this) {
     UpdateUiState.ReadyToInstall,
     UpdateUiState.InstallationPermissionRequired,
     UpdateUiState.InstallerLaunched,
-    UpdateUiState.Cancelled -> true
+    UpdateUiState.Cancelled,
+    is UpdateUiState.InstallerError -> true
 
     UpdateUiState.Idle,
     UpdateUiState.Checking,
