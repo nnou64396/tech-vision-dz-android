@@ -5,6 +5,10 @@
          and load content images over the network. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Required to hand the verified update APK to Android's package
+         installer (the in-app updater's install-from-unknown-sources flow). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Android 11+ (API 30+) package visibility: lets the app resolve the
          system package installer for APK updates without broad visibility. -->
     <queries>
