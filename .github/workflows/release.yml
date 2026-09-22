@@ -253,7 +253,7 @@ jobs:
       - name: Ensure versionCode is newer than the previous production release
         run: |
           PREV_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/update-manifest.json"
-          if PREV="$(curl -sf --max-time 30 "$PREV_URL")"; then
+          if PREV="$(curl -sLf --max-time 30 "$PREV_URL")"; then
             PREV_VC="$(jq -r '.versionCode // empty' <<< "$PREV")"
             if [ -n "$PREV_VC" ] && [ "$APK_VERSION_CODE" -le "$PREV_VC" ]; then
               echo "::error::APK versionCode $APK_VERSION_CODE is not greater than the previous production versionCode $PREV_VC."
