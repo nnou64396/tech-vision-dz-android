@@ -149,6 +149,9 @@
     <string name="update_failed">Update failed. Please try again.</string>
     <string name="update_error_verify">The downloaded update could not be verified and will be discarded.</string>
     <string name="update_error_launch">Android could not open the installer. Please try again.</string>
+    <string name="update_error_installer_unavailable">No app on this device can open the update. Download the latest APK from the official TECH VISION DZ release page and open it to install it manually.</string>
+    <string name="update_error_apk_missing">The downloaded update is no longer available. Check for updates again to re-download it.</string>
+    <string name="update_error_too_old">This app version can\'t update itself. Install the latest APK from the official TECH VISION DZ release page to continue.</string>
     <string name="update_error_permission">Installing updates requires permission from Android.</string>
     <string name="update_error_permission_not_declared">This version of the app cannot install updates by itself. Download the latest APK from the official TECH VISION DZ release page and open it to install it manually.</string>
     <string name="update_install_error">Update install failed</string>

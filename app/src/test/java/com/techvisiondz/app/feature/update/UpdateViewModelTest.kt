@@ -5,6 +5,8 @@ import android.content.Intent
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.update.ApkVerificationResult
 import com.techvisiondz.app.core.update.InstallLaunchResult
+import com.techvisiondz.app.core.update.InstallPermissionState
+import com.techvisiondz.app.core.update.InstallerResolution
 import com.techvisiondz.app.core.update.UpdateApkDownloader
 import com.techvisiondz.app.core.update.UpdateApkInstaller
 import com.techvisiondz.app.core.update.UpdateApkVerifier
@@ -14,6 +16,8 @@ import com.techvisiondz.app.core.update.UpdatePreferences
 import com.techvisiondz.app.core.update.UpdateRepository
 import com.techvisiondz.app.core.update.UpdateTestFixtures
 import com.techvisiondz.app.core.update.UpdateTransportException
+import com.techvisiondz.app.core.update.installerResolutionFor
+import com.techvisiondz.app.core.update.permissionOutcome
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -118,6 +122,10 @@ class UpdateViewModelTest {
         enum class PermissionState { Allowed, Denied, NotDeclared }
 
         var permission: PermissionState = PermissionState.Allowed
+
+        /** Whether the fake sees an activity that can open the APK. */
+        var resolveActivityResolvable = true
+
         var result: InstallLaunchResult = InstallLaunchResult.Launched
 
         /**
@@ -129,13 +137,23 @@ class UpdateViewModelTest {
         var throwFromLaunch: Throwable? = null
         var lastApk: File? = null
 
-        override fun canRequestPackageInstalls(): Boolean = when (permission) {
-            PermissionState.Allowed -> true
-            PermissionState.Denied -> false
-            PermissionState.NotDeclared -> throw SecurityException(
-                "Need to declare android.permission.REQUEST_INSTALL_PACKAGES to call this api",
-            )
+        // Faithful to AndroidUpdateApkInstaller: the probe maps a SecurityException
+        // (undeclared permission) into the typed NotDeclared state, never throws.
+        override fun installPermissionState(): InstallPermissionState = permissionOutcome {
+            when (permission) {
+                PermissionState.Allowed -> true
+                PermissionState.Denied -> false
+                PermissionState.NotDeclared -> throw SecurityException(
+                    "Need to declare android.permission.REQUEST_INSTALL_PACKAGES to call this api",
+                )
+            }
         }
+
+        override fun resolveInstaller(apk: File): InstallerResolution = installerResolutionFor(
+            permission = installPermissionState(),
+            activityResolvable = resolveActivityResolvable,
+            launchIntent = Intent(),
+        )
 
         override fun launchInstaller(apk: File): InstallLaunchResult {
             lastApk = apk
@@ -560,6 +578,164 @@ class UpdateViewModelTest {
 
         viewModel.installUpdate()
         assertEquals(UpdateUiState.InstallerError(R.string.update_error_launch), viewModel.uiState.value)
+    }
+
+    @Test
+    fun `installer unavailable surfaces a distinct visible error`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            permission = FakeUpdateInstaller.PermissionState.Allowed
+            result = InstallLaunchResult.InstallerUnavailable
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+
+        viewModel.installUpdate()
+        assertEquals(
+            UpdateUiState.InstallerError(R.string.update_error_installer_unavailable),
+            viewModel.uiState.value,
+        )
+    }
+
+    @Test
+    fun `install with missing staged apk surfaces a visible error instead of silent idle`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val viewModel = viewModel(fetcher)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        assertEquals(UpdateUiState.ReadyToInstall, viewModel.uiState.value)
+
+        // Cache cleared while the update was ready.
+        stagedFile.delete()
+        viewModel.installUpdate()
+
+        // Regression: this used to silently reset to Idle, losing the update
+        // with no explanation. It must now be a visible, actionable error.
+        assertEquals(UpdateUiState.InstallerError(R.string.update_error_apk_missing), viewModel.uiState.value)
+    }
+
+    @Test
+    fun `check below the manifest minimum surfaces too old and never downloads`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(
+            manifest = UpdateTestFixtures.manifest(versionCode = 5, minimumVersionCode = 4),
+        )
+        val downloader = FakeUpdateDownloader()
+        val viewModel = viewModel(
+            fetcher,
+            currentVersionCode = 2,
+            downloader = downloader,
+        )
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+
+        assertEquals(UpdateUiState.Error(R.string.update_error_too_old), viewModel.uiState.value)
+        assertEquals(0, downloader.startCount)
+    }
+
+    @Test
+    fun `settings return after grant resumes to ready to install without redownload`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            permission = FakeUpdateInstaller.PermissionState.Denied
+        }
+        val downloader = FakeUpdateDownloader()
+        val viewModel = viewModel(fetcher, installer = installer, downloader = downloader)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        assertEquals(UpdateUiState.ReadyToInstall, viewModel.uiState.value)
+
+        viewModel.installUpdate()
+        assertEquals(UpdateUiState.InstallationPermissionRequired, viewModel.uiState.value)
+        assertEquals(1, downloader.startCount)
+
+        // User grants the permission in Settings and returns.
+        installer.permission = FakeUpdateInstaller.PermissionState.Allowed
+        viewModel.onPermissionSettingsReturned()
+
+        // The already-verified staged APK is reused: back to ReadyToInstall,
+        // and the downloader was never called again.
+        assertEquals(UpdateUiState.ReadyToInstall, viewModel.uiState.value)
+        assertEquals(1, downloader.startCount)
+    }
+
+    @Test
+    fun `settings return while still denied stays on permission required`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            permission = FakeUpdateInstaller.PermissionState.Denied
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        viewModel.installUpdate()
+        assertEquals(UpdateUiState.InstallationPermissionRequired, viewModel.uiState.value)
+
+        viewModel.onPermissionSettingsReturned()
+
+        assertEquals(UpdateUiState.InstallationPermissionRequired, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `settings return with missing staged apk surfaces a visible error`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            permission = FakeUpdateInstaller.PermissionState.Denied
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        viewModel.installUpdate()
+        assertEquals(UpdateUiState.InstallationPermissionRequired, viewModel.uiState.value)
+
+        // The staged APK disappears while the user is in Settings.
+        stagedFile.delete()
+        installer.permission = FakeUpdateInstaller.PermissionState.Allowed
+        viewModel.onPermissionSettingsReturned()
+
+        assertEquals(UpdateUiState.InstallerError(R.string.update_error_apk_missing), viewModel.uiState.value)
+    }
+
+    @Test
+    fun `settings return with undeclared permission surfaces a distinct visible error`() = runTest(dispatcher) {
+        val fetcher = FakeManifestFetcher(manifest = availableManifest())
+        val installer = FakeUpdateInstaller().apply {
+            permission = FakeUpdateInstaller.PermissionState.Denied
+        }
+        val viewModel = viewModel(fetcher, installer = installer)
+
+        viewModel.checkForUpdate()
+        advanceUntilIdle()
+        viewModel.updateNow()
+        advanceUntilIdle()
+        viewModel.installUpdate()
+        assertEquals(UpdateUiState.InstallationPermissionRequired, viewModel.uiState.value)
+
+        // Should be unreachable on v1.1.3+ binaries, but the live probe can
+        // still report it; the flow must map it cleanly instead of crashing.
+        installer.permission = FakeUpdateInstaller.PermissionState.NotDeclared
+        viewModel.onPermissionSettingsReturned()
+
+        assertEquals(
+            UpdateUiState.InstallerError(R.string.update_error_permission_not_declared),
+            viewModel.uiState.value,
+        )
     }
 
     @Test

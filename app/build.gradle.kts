@@ -48,8 +48,8 @@ android {
         targetSdk = 37
         // versionCode is the authoritative update ordering key. versionName is
         // display-only and normalized to match the v1.0.0 GitHub release.
-        versionCode = 7
-        versionName = "1.1.4"
+        versionCode = 8
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -207,6 +207,23 @@ abstract class VerifyReleaseApkTask : DefaultTask() {
                     )
                 } else {
                     val badging = runSdkTool(aapt2, listOf("dump", "badging"), apk, "aapt2 dump badging")
+                    val manifestXml = runSdkTool(
+                        aapt2,
+                        listOf("dump", "xmltree", "--file", "AndroidManifest.xml"),
+                        apk,
+                        "aapt2 dump xmltree AndroidManifest.xml",
+                    )
+                    val filePathsXml = runSdkTool(
+                        aapt2,
+                        listOf(
+                            "dump",
+                            "xmltree",
+                            "--file",
+                            resolvePackagedResourcePath(aapt2, apk, "xml/file_paths") ?: "res/xml/file_paths.xml",
+                        ),
+                        apk,
+                        "aapt2 dump xmltree res/xml/file_paths.xml",
+                    )
                     val apkSign = runSdkTool(apksigner, listOf("verify", "--print-certs"), apk, "apksigner verify")
 
                     if (apk.length() == 0L) {
@@ -228,6 +245,8 @@ abstract class VerifyReleaseApkTask : DefaultTask() {
                         ),
                         apkSha256 = apkSha256,
                         badgingOutput = badging?.output,
+                        manifestXmlTreeOutput = manifestXml?.output,
+                        filePathsXmlTreeOutput = filePathsXml?.output,
                         apksignerOutput = apkSign?.output,
                         apksignerExitOk = apkSign?.exitOk == true,
                     )
@@ -238,6 +257,10 @@ abstract class VerifyReleaseApkTask : DefaultTask() {
                         versionCode = reportVersionCode(badging?.output),
                         versionName = reportVersionName(badging?.output),
                         permissionDeclared = reportPermissionDeclared(badging?.output),
+                        providerConfigurationOk = ReleaseApkVerifier.providerConfigurationOk(
+                            manifestXml?.output,
+                            "${expectedApplicationId.get()}.fileprovider",
+                        ),
                         certificateSha256 = reportCertificateSha256(apkSign?.output),
                         apkSha256 = apkSha256,
                     )
@@ -255,6 +278,7 @@ abstract class VerifyReleaseApkTask : DefaultTask() {
                   versionCode: ${d.versionCode}
                   versionName: ${d.versionName}
                   REQUEST_INSTALL_PACKAGES: ${if (d.permissionDeclared) "declared" else "missing"}
+                  FileProvider config: ${if (d.providerConfigurationOk) "authority/exported/grant/paths ok" else "invalid"}
                   signing certificate SHA-256: ${d.certificateSha256}
                   APK SHA-256: ${d.apkSha256}
                 """.trimIndent(),
@@ -302,6 +326,20 @@ abstract class VerifyReleaseApkTask : DefaultTask() {
     private fun isWindows(): Boolean =
         System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 
+    /**
+     * Maps a resource table name (`xml/file_paths`) to its packaged path inside
+     * the APK (`res/8K.xml`). Release builds obfuscate XML resource file names,
+     * so the conventional path is not present and must be looked up.
+     */
+    private fun resolvePackagedResourcePath(aapt2: File, apk: File, resourceName: String): String? {
+        val resources = runSdkTool(aapt2, listOf("dump", "resources"), apk, "aapt2 dump resources") ?: return null
+        val lines = resources.output.lineSequence().toList()
+        val marker = lines.indexOfFirst { Regex("""resource 0x[0-9a-fA-F]+ $resourceName$""").containsMatchIn(it.trim()) }
+        if (marker < 0) return null
+        val fileLine = lines.drop(marker + 1).take(6).firstOrNull { "(file)" in it } ?: return null
+        return Regex("""res/\S+""").find(fileLine)?.value
+    }
+
     private fun runSdkTool(executable: File, args: List<String>, apk: File, what: String): ToolOutput? {
         val sink = ByteArrayOutputStream()
         val command = if (isWindows() && executable.name.endsWith(".bat")) {
@@ -334,6 +372,7 @@ abstract class VerifyReleaseApkTask : DefaultTask() {
         val versionCode: String,
         val versionName: String,
         val permissionDeclared: Boolean,
+        val providerConfigurationOk: Boolean,
         val certificateSha256: String,
         val apkSha256: String,
     )
@@ -358,7 +397,7 @@ androidComponents {
     onVariants(selector().withBuildType("release")) { variant ->
         tasks.register<VerifyReleaseApkTask>("verifyReleaseApk") {
             group = "verification"
-            description = "Verifies the final signed release APK: applicationId, versionCode/versionName, REQUEST_INSTALL_PACKAGES, production signing certificate, structural validity, and SHA-256."
+            description = "Verifies the final signed release APK: applicationId, versionCode/versionName, REQUEST_INSTALL_PACKAGES, FileProvider install configuration, production signing certificate, structural validity, and SHA-256."
             // Always verify the artifact freshly produced by the current release build.
             dependsOn("assembleRelease")
             // Resolved from AGP, so this matches the actual artifact of this build

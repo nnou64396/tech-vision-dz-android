@@ -57,7 +57,16 @@ class UpdateRepository(
 
                 is UpdateManifestValidator.Validation.Valid -> {
                     val update = validation.update
-                    if (update.versionCode <= currentVersionCode) {
+                    // A device below the manifest's minimumVersionCode cannot
+                    // install this update by itself (the self-install permission
+                    // did not exist yet); block before any download and tell the
+                    // user precisely, instead of downloading an APK that is then
+                    // discarded at verification.
+                    if (update.minimumVersionCode != null &&
+                        currentVersionCode < update.minimumVersionCode
+                    ) {
+                        UpdateCheckResult.Failed(UpdateError.BelowMinimum)
+                    } else if (update.versionCode <= currentVersionCode) {
                         UpdateCheckResult.NoUpdate
                     } else {
                         UpdateCheckResult.UpdateAvailable(update)

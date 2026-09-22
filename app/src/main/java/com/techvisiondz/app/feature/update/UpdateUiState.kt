@@ -8,6 +8,10 @@ package com.techvisiondz.app.feature.update
  * [Error]) → [Downloading] → [Verifying] → [ReadyToInstall] →
  * ([InstallationPermissionRequired] | [InstallerLaunched] | [Error] |
  * [InstallerError]).
+ * [InstallationPermissionRequired] loops back to [ReadyToInstall] when the
+ * user returns from Settings with the permission granted and the staged
+ * verified APK preserved (`onPermissionSettingsReturned`); the final install
+ * stays a separate, user-initiated Install tap.
  * [Cancelled] is reached only via an explicit user cancel of a download.
  */
 sealed interface UpdateUiState {

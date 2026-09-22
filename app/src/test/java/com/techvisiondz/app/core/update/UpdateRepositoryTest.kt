@@ -68,6 +68,18 @@ class UpdateRepositoryTest {
     }
 
     @Test
+    fun `installed version below the manifest minimum maps to below minimum failure`() = runTest {
+        val fetcher = FakeUpdateManifestFetcher(
+            manifest = UpdateTestFixtures.manifest(versionCode = 5, minimumVersionCode = 4),
+        )
+        val result = repository(fetcher, currentVersionCode = 2).checkForUpdate()
+
+        assertEquals(UpdateCheckResult.Failed(UpdateError.BelowMinimum), result)
+        // The check still ran exactly once; only the download would be skipped.
+        assertEquals(1, fetcher.fetchCount)
+    }
+
+    @Test
     fun `malformed manifest maps to malformed failure`() = runTest {
         val fetcher = FakeUpdateManifestFetcher(manifest = "{ not json")
         assertEquals(

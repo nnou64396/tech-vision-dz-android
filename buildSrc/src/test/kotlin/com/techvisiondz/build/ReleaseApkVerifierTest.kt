@@ -1,5 +1,6 @@
 package com.techvisiondz.build
 
+import com.techvisiondz.build.ReleaseApkVerifier.allDescendants
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,6 +26,50 @@ class ReleaseApkVerifierTest {
         uses-permission: name='com.techvisiondz.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
     """.trimIndent()
 
+    // aapt2 (Build Tools 36) dump xmltree AndroidManifest.xml shape: attribute
+    // names are full namespace URIs and simple values are bare booleans/integers.
+    private val realManifestXml = """
+        N: android=http://schemas.android.com/apk/res/android
+          E: manifest (line=2)
+            A: http://schemas.android.com/apk/res/android:versionCode(0x0101021b)=8
+            A: http://schemas.android.com/apk/res/android:versionName(0x0101021c)="1.1.5" (Raw: "1.1.5")
+            A: package="com.techvisiondz.app" (Raw: "com.techvisiondz.app")
+            E: uses-sdk (line=7)
+              A: http://schemas.android.com/apk/res/android:minSdkVersion(0x0101020c)=26
+              A: http://schemas.android.com/apk/res/android:targetSdkVersion(0x01010270)=37
+            E: uses-permission (line=9)
+              A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.INTERNET" (Raw: "android.permission.INTERNET")
+            E: uses-permission (line=11)
+              A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.REQUEST_INSTALL_PACKAGES" (Raw: "android.permission.REQUEST_INSTALL_PACKAGES")
+            E: queries (line=27)
+              E: intent (line=29)
+                E: action (line=30)
+                  A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.intent.action.VIEW" (Raw: "android.intent.action.VIEW")
+                E: data (line=31)
+                  A: http://schemas.android.com/apk/res/android:mimeType(0x01010011)="application/vnd.android.package-archive" (Raw: "application/vnd.android.package-archive")
+            E: application (line=36)
+              A: http://schemas.android.com/apk/res/android:allowBackup(0x01010080)=false
+              E: activity (line=46)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="com.techvisiondz.app.MainActivity" (Raw: "com.techvisiondz.app.MainActivity")
+              E: provider (line=113)
+                A: http://schemas.android.com/apk/res/android:name(0x01010003)="androidx.core.content.FileProvider" (Raw: "androidx.core.content.FileProvider")
+                A: http://schemas.android.com/apk/res/android:authorities(0x01010018)="com.techvisiondz.app.fileprovider" (Raw: "com.techvisiondz.app.fileprovider")
+                A: http://schemas.android.com/apk/res/android:exported(0x01010010)=false
+                A: http://schemas.android.com/apk/res/android:grantUriPermissions(0x0101001b)=true
+                E: meta-data (line=116)
+                  A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.support.FILE_PROVIDER_PATHS" (Raw: "android.support.FILE_PROVIDER_PATHS")
+                  A: http://schemas.android.com/apk/res/android:resource(0x01010025)=@0x7f0c0002 (Raw: "res/xml/file_paths")
+    """.trimIndent()
+
+    // aapt2 resource dump of the (obfuscated) file_paths XML: attrs drop the
+    // android: namespace prefix and the 0x resource id.
+    private val realFilePathsXml = """
+          E: paths (line=10)
+            E: cache-path (line=13)
+              A: name="updater" (Raw: "updater")
+              A: path="updater/" (Raw: "updater/")
+    """.trimIndent()
+
     // Real `apksigner verify --print-certs` output for the production certificate.
     private val realApksigner = """
         Signer #1 certificate DN: CN=TECH VISION DZ, OU=Android, O=TECH VISION DZ, C=DZ
@@ -43,6 +88,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = realApksigner,
             apksignerExitOk = true,
         )
@@ -64,6 +111,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = buildTools37Certs,
             apksignerExitOk = true,
         )
@@ -82,6 +131,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = badgingWithoutPermission,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = realApksigner,
             apksignerExitOk = true,
         )
@@ -118,6 +169,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = wrongCerts,
             apksignerExitOk = true,
         )
@@ -134,6 +187,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = apksignerWithoutDigest,
             apksignerExitOk = true,
         )
@@ -154,6 +209,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = badging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = realApksigner,
             apksignerExitOk = true,
         )
@@ -171,6 +228,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = badging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = realApksigner,
             apksignerExitOk = true,
         )
@@ -189,6 +248,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = "ERROR: failed to verify",
             apksignerExitOk = false,
         )
@@ -203,6 +264,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = null,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = realApksigner,
             apksignerExitOk = true,
         )
@@ -217,6 +280,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = "totally-not-aapt2-output\n",
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = realApksigner,
             apksignerExitOk = true,
         )
@@ -305,6 +370,8 @@ class ReleaseApkVerifierTest {
             expected = expected,
             apkSha256 = dummySha256,
             badgingOutput = realBadging,
+            manifestXmlTreeOutput = realManifestXml,
+            filePathsXmlTreeOutput = realFilePathsXml,
             apksignerOutput = malformed,
             apksignerExitOk = true,
         )
@@ -323,5 +390,122 @@ class ReleaseApkVerifierTest {
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             ReleaseApkVerifier.sha256(ByteArray(0)),
         )
+    }
+
+    // --- Manifest / file-paths XML structure (xmltree) -------------------
+
+    @Test
+    fun `parseXmlTree reads names authorities and boolean attributes`() {
+        val tree = ReleaseApkVerifier.parseXmlTree(realManifestXml)
+        assertEquals("manifest", tree.single().tag)
+
+        val provider = tree.flatMap { it.allDescendants() }
+            .single { it.tag == "provider" }
+        assertEquals("androidx.core.content.FileProvider", provider.attributes["android:name"])
+        assertEquals("com.techvisiondz.app.fileprovider", provider.attributes["android:authorities"])
+        assertEquals("0x0", provider.attributes["android:exported"])
+        assertEquals("0xffffffff", provider.attributes["android:grantUriPermissions"])
+    }
+
+    @Test
+    fun `parseXmlTree reads the cache path element with bare namespace-less attributes`() {
+        val tree = ReleaseApkVerifier.parseXmlTree(realFilePathsXml)
+        val cachePath = tree.flatMap { it.allDescendants() }.single { it.tag == "cache-path" }
+        assertEquals("updater", ReleaseApkVerifier.attr(cachePath, "android:name"))
+        assertEquals("updater/", ReleaseApkVerifier.attr(cachePath, "android:path"))
+    }
+
+    @Test
+    fun `manifest xml is unreadable when aapt2 produced no output`() {
+        val failures = ReleaseApkVerifier.verifyManifestStructure(null, expected)
+        assertFalse(failures.isEmpty())
+        assertTrue(failures.single().check.contains("manifest XML can be read"))
+    }
+
+    @Test
+    fun `missing fileprovider fails the manifest check`() {
+        val xml = realManifestXml.replace(
+            "androidx.core.content.FileProvider",
+            "androidx.core.content.SomeOtherProvider",
+        )
+        val failures = ReleaseApkVerifier.verifyManifestStructure(xml, expected)
+        assertTrue(failures.any { it.check == "AndroidManifest declares the update FileProvider" })
+    }
+
+    @Test
+    fun `wrong fileprovider authority fails the manifest check`() {
+        val xml = realManifestXml.replace(
+            "com.techvisiondz.app.fileprovider",
+            "com.other.app.fileprovider",
+        )
+        val failures = ReleaseApkVerifier.verifyManifestStructure(xml, expected)
+        assertTrue(failures.any { it.check == "Update FileProvider authority" })
+    }
+
+    @Test
+    fun `exported fileprovider fails the manifest check`() {
+        val xml = realManifestXml.replace(
+            "A: http://schemas.android.com/apk/res/android:exported(0x01010010)=false",
+            "A: http://schemas.android.com/apk/res/android:exported(0x01010010)=true",
+        )
+        val failures = ReleaseApkVerifier.verifyManifestStructure(xml, expected)
+        assertTrue(failures.any { it.check == "Update FileProvider is not exported" })
+    }
+
+    @Test
+    fun `fileprovider without uri grants fails the manifest check`() {
+        val xml = realManifestXml.replace(
+            "A: http://schemas.android.com/apk/res/android:grantUriPermissions(0x0101001b)=true",
+            "A: http://schemas.android.com/apk/res/android:grantUriPermissions(0x0101001b)=false",
+        )
+        val failures = ReleaseApkVerifier.verifyManifestStructure(xml, expected)
+        assertTrue(failures.any { it.check == "Update FileProvider grants URI permissions" })
+    }
+
+    @Test
+    fun `missing queries block fails the manifest check`() {
+        val withoutQueries = realManifestXml.replace("E: queries (line=27)\n", "")
+        val failures = ReleaseApkVerifier.verifyManifestStructure(withoutQueries, expected)
+        assertTrue(failures.any { it.check.contains("<queries>") })
+    }
+
+    @Test
+    fun `file paths xml is unreadable when aapt2 produced no output`() {
+        val failures = ReleaseApkVerifier.verifyFilePathsStructure(null, expected)
+        assertFalse(failures.isEmpty())
+        assertTrue(failures.single().check.contains("file-paths XML can be read"))
+    }
+
+    @Test
+    fun `file paths xml without the updater cache path fails`() {
+        val xml = realFilePathsXml.replace(
+            """A: path="updater/" (Raw: "updater/")""",
+            """A: path="other/" (Raw: "other/")""",
+        )
+        val failures = ReleaseApkVerifier.verifyFilePathsStructure(xml, expected)
+        assertTrue(failures.any { it.check.contains("updater cache path") })
+    }
+
+    @Test
+    fun `conformant xml passes the structural checks`() {
+        assertTrue(ReleaseApkVerifier.verifyManifestStructure(realManifestXml, expected).isEmpty())
+        assertTrue(ReleaseApkVerifier.verifyFilePathsStructure(realFilePathsXml, expected).isEmpty())
+    }
+
+    @Test
+    fun `providerConfigurationOk reports valid and invalid configurations`() {
+        assertTrue(
+            ReleaseApkVerifier.providerConfigurationOk(
+                realManifestXml,
+                "com.techvisiondz.app.fileprovider",
+            ),
+        )
+        assertFalse(
+            ReleaseApkVerifier.providerConfigurationOk(
+                realManifestXml,
+                "com.other.fileprovider",
+            ),
+        )
+        assertFalse(ReleaseApkVerifier.providerConfigurationOk(null, "com.techvisiondz.app.fileprovider"))
     }
 }

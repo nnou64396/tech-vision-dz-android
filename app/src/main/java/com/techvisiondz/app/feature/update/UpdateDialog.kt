@@ -28,8 +28,11 @@ import kotlin.math.roundToInt
  *  - download progress with a Cancel action,
  *  - verification,
  *  - install confirmation (never implicit),
- *  - a permission explanation with a *manual* "Open settings" action — the
- *    dialog never opens system settings on its own,
+ *  - a permission explanation with *manual* actions: "Open settings" opens the
+ *    "install unknown apps" page (the host does the launch, the dialog only
+ *    reports the intent) and "Install" re-checks the permission and resumes —
+ *    so a user returning from Settings is never stuck. The dialog never opens
+ *    system settings on its own,
  *  - a post-launch state that does not claim installation has completed;
  *    Android's own package installer owns the actual install.
  *
@@ -149,8 +152,8 @@ fun UpdateDialog(
                 UpdateUiState.ReadyToInstall -> TextButton(onClick = onLater) {
                     Text(stringResource(R.string.update_later))
                 }
-                UpdateUiState.InstallationPermissionRequired -> TextButton(onClick = onLater) {
-                    Text(stringResource(R.string.update_not_now))
+                UpdateUiState.InstallationPermissionRequired -> TextButton(onClick = onInstall) {
+                    Text(stringResource(R.string.update_install))
                 }
                 else -> Unit
             }

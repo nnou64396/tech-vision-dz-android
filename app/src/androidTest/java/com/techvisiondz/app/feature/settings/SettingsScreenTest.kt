@@ -17,6 +17,8 @@ import com.techvisiondz.app.core.settings.FakeSettingsPreferences
 import com.techvisiondz.app.core.settings.ThemeMode
 import com.techvisiondz.app.core.update.ApkVerificationResult
 import com.techvisiondz.app.core.update.InstallLaunchResult
+import com.techvisiondz.app.core.update.InstallPermissionState
+import com.techvisiondz.app.core.update.InstallerResolution
 import com.techvisiondz.app.core.update.UpdateApkDownloader
 import com.techvisiondz.app.core.update.UpdateApkInstaller
 import com.techvisiondz.app.core.update.UpdateApkVerifier
@@ -88,7 +90,8 @@ class SettingsScreenTest {
                 ApkVerificationResult.Success
         },
         installer = object : UpdateApkInstaller {
-            override fun canRequestPackageInstalls(): Boolean = true
+            override fun installPermissionState(): InstallPermissionState = InstallPermissionState.Allowed
+            override fun resolveInstaller(apk: File): InstallerResolution = InstallerResolution.Ready(Intent())
             override fun launchInstaller(apk: File): InstallLaunchResult = InstallLaunchResult.Launched
             override fun unknownAppSourcesSettingsIntent(): Intent = Intent()
         },

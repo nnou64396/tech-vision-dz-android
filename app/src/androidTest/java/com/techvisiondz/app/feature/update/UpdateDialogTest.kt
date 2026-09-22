@@ -101,11 +101,13 @@ class UpdateDialogTest {
     }
 
     @Test
-    fun permissionRequiredShowsOpenSettingsAndNotNow() {
+    fun permissionRequiredShowsOpenSettingsAndInstall() {
         setDialog(state = UpdateUiState.InstallationPermissionRequired)
 
         composeRule.onNodeWithText(context.getString(R.string.update_open_settings)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.update_not_now)).assertIsDisplayed()
+        // The secondary action is Install: it re-checks the permission after the
+        // settings detour and resumes, instead of forcing "Not now"/postpone.
+        composeRule.onNodeWithText(context.getString(R.string.update_install)).assertIsDisplayed()
     }
 
     @Test

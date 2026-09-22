@@ -1,5 +1,6 @@
 package com.techvisiondz.app.core.update
 
+import android.content.Intent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,12 +15,12 @@ class UpdateApkInstallerRulesTest {
 
     @Test
     fun `allowed probe maps to allowed`() {
-        assertEquals(PermissionOutcome.Allowed, permissionOutcome { true })
+        assertEquals(InstallPermissionState.Allowed, permissionOutcome { true })
     }
 
     @Test
     fun `denied probe maps to denied not not declared`() {
-        assertEquals(PermissionOutcome.Denied, permissionOutcome { false })
+        assertEquals(InstallPermissionState.Denied, permissionOutcome { false })
     }
 
     @Test
@@ -32,7 +33,7 @@ class UpdateApkInstallerRulesTest {
                 "Need to declare android.permission.REQUEST_INSTALL_PACKAGES to call this api",
             )
         }
-        assertEquals(PermissionOutcome.NotDeclared, outcome)
+        assertEquals(InstallPermissionState.NotDeclared, outcome)
     }
 
     @Test
@@ -59,5 +60,58 @@ class UpdateApkInstallerRulesTest {
         val result = installLaunchOutcome { launched = true }
         assertEquals(InstallLaunchResult.Launched, result)
         assertTrue(launched)
+    }
+
+    // --- InstallerResolution rules (permission probe + activity resolution) ----
+
+    @Test
+    fun `resolution requires the permission before resolving an activity`() {
+        val resolution = installerResolutionFor(
+            permission = InstallPermissionState.Denied,
+            activityResolvable = true,
+            launchIntent = Intent(),
+        )
+        assertEquals(InstallerResolution.PermissionRequired, resolution)
+    }
+
+    @Test
+    fun `undeclared permission short-circuits resolution to not declared`() {
+        val resolution = installerResolutionFor(
+            permission = InstallPermissionState.NotDeclared,
+            activityResolvable = true,
+            launchIntent = Intent(),
+        )
+        assertEquals(InstallerResolution.PermissionNotDeclared, resolution)
+    }
+
+    @Test
+    fun `allowed permission with a resolvable activity is ready`() {
+        val intent = Intent(Intent.ACTION_VIEW)
+        val resolution = installerResolutionFor(
+            permission = InstallPermissionState.Allowed,
+            activityResolvable = true,
+            launchIntent = intent,
+        )
+        assertEquals(InstallerResolution.Ready(intent), resolution)
+    }
+
+    @Test
+    fun `allowed permission with no resolvable activity is installer unavailable`() {
+        val resolution = installerResolutionFor(
+            permission = InstallPermissionState.Allowed,
+            activityResolvable = false,
+            launchIntent = Intent(),
+        )
+        assertEquals(InstallerResolution.InstallerUnavailable, resolution)
+    }
+
+    @Test
+    fun `allowed permission with no intent is installer unavailable`() {
+        val resolution = installerResolutionFor(
+            permission = InstallPermissionState.Allowed,
+            activityResolvable = true,
+            launchIntent = null,
+        )
+        assertEquals(InstallerResolution.InstallerUnavailable, resolution)
     }
 }

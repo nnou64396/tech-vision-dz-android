@@ -1,5 +1,7 @@
 package com.techvisiondz.app.feature.update
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,7 +20,12 @@ import androidx.compose.ui.platform.LocalContext
  * Opening the "install unknown apps" system settings page happens here —
  * explicitly, from the dialog's Open settings button and only when the
  * ViewModel reports [UpdateUiState.InstallationPermissionRequired] — and never
- * inside the ViewModel or dialog.
+ * inside the ViewModel or dialog. The launch goes through an Activity Result
+ * contract so control returning from Settings invokes
+ * [UpdateViewModel.onPermissionSettingsReturned], which re-probes the
+ * permission and resumes the flow (the verified staged APK is kept, never
+ * re-downloaded). The final install itself always remains a separate,
+ * user-initiated Install tap.
  */
 @Composable
 fun UpdateDialogHost(
@@ -28,6 +35,12 @@ fun UpdateDialogHost(
     val state by updateViewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    val settingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        updateViewModel.onPermissionSettingsReturned()
+    }
+
     UpdateDialog(
         state = state,
         onUpdateNow = updateViewModel::updateNow,
@@ -36,7 +49,7 @@ fun UpdateDialogHost(
         onInstall = updateViewModel::installUpdate,
         onOpenSettings = {
             updateViewModel.appSourceSettingsIntent()?.let { intent ->
-                context.startActivity(intent)
+                settingsLauncher.launch(intent)
             }
         },
         onDismiss = updateViewModel::dismiss,

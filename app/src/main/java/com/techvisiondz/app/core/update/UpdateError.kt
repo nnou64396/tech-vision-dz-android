@@ -39,6 +39,9 @@ sealed interface UpdateError {
     /** The downloaded APK's version does not match the manifest version. */
     data object WrongVersion : UpdateError
 
+    /** The installed app is older than the manifest's minimumVersionCode; it cannot self-update. */
+    data object BelowMinimum : UpdateError
+
     /** The app is not allowed to request package installations (declared but denied). */
     data object InstallationPermissionRequired : UpdateError
 
@@ -47,6 +50,9 @@ sealed interface UpdateError {
 
     /** Android's system package installer could not be launched. */
     data object InstallerLaunch : UpdateError
+
+    /** No activity on the device can open the update APK. */
+    data object InstallerUnavailable : UpdateError
 
     /** The user or the system cancelled the update flow. */
     data object Cancelled : UpdateError

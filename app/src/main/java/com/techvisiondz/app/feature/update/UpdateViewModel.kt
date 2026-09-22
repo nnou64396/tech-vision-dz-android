@@ -11,6 +11,7 @@ import com.techvisiondz.app.core.update.AndroidUpdateApkInstaller
 import com.techvisiondz.app.core.update.AndroidUpdateApkVerifier
 import com.techvisiondz.app.core.update.ApkVerificationResult
 import com.techvisiondz.app.core.update.InstallLaunchResult
+import com.techvisiondz.app.core.update.InstallPermissionState
 import com.techvisiondz.app.core.update.OkHttpUpdateApkDownloader
 import com.techvisiondz.app.core.update.SharedPrefsUpdatePreferences
 import com.techvisiondz.app.core.update.UpdateApkDownloader
@@ -81,6 +82,16 @@ class UpdateViewModel(
     private var pendingUpdate: UpdateInfo? = null
     private var checkInProgress = false
     private var downloadJob: Job? = null
+
+    /**
+     * VersionCode of the APK currently staged and verified by the download
+     * stage. Set only after [UpdateApkVerifier] reports success; cleared when
+     * the staged file is abandoned. This is what makes the settings permission
+     * detour safe: after the user returns we only ever resume to
+     * [UpdateUiState.ReadyToInstall] for that exact verified APK, never for a
+     * re-download or an unverified file.
+     */
+    private var verifiedUpdateVersionCode: Int? = null
 
     /**
      * Checks for an update. With [manual] = false (automatic checks) the
@@ -162,9 +173,11 @@ class UpdateViewModel(
 
         val apk = stagedApkProvider()
         if (!apk.exists()) {
-            // Staged file no longer present (e.g. cache cleared); ask again.
+            // Staged file no longer present (e.g. cache cleared); the user must
+            // re-download. A visible error beats silently dropping the request.
             pendingUpdate = null
-            _uiState.value = UpdateUiState.Idle
+            verifiedUpdateVersionCode = null
+            _uiState.value = UpdateUiState.InstallerError(R.string.update_error_apk_missing)
             return
         }
 
@@ -187,8 +200,42 @@ class UpdateViewModel(
                 UpdateUiState.InstallationPermissionRequired
             InstallLaunchResult.PermissionNotDeclared ->
                 UpdateUiState.InstallerError(updateErrorMessageRes(UpdateError.PermissionNotDeclared))
+            InstallLaunchResult.InstallerUnavailable ->
+                UpdateUiState.InstallerError(updateErrorMessageRes(UpdateError.InstallerUnavailable))
             InstallLaunchResult.LaunchFailed ->
                 UpdateUiState.InstallerError(updateErrorMessageRes(UpdateError.InstallerLaunch))
+        }
+    }
+
+    /**
+     * Callback invoked when control returns from the "install unknown apps"
+     * system settings page (launched via [appSourceSettingsIntent]). Re-probes
+     * the permission against the *typed* [InstallPermissionState] so a
+     * [SecurityException] (undeclared permission) can never crash the flow, and
+     * resumes to [UpdateUiState.ReadyToInstall] only when the permission is now
+     * allowed AND the still-staged, already-verified APK is present — no
+     * re-download.
+     */
+    fun onPermissionSettingsReturned() {
+        if (_uiState.value !is UpdateUiState.InstallationPermissionRequired) return
+
+        when (installer.installPermissionState()) {
+            InstallPermissionState.Allowed -> {
+                if (verifiedUpdateVersionCode != null && stagedApkProvider().exists()) {
+                    _uiState.value = UpdateUiState.ReadyToInstall
+                } else {
+                    pendingUpdate = null
+                    verifiedUpdateVersionCode = null
+                    _uiState.value =
+                        UpdateUiState.InstallerError(R.string.update_error_apk_missing)
+                }
+            }
+            // Still denied: the user closed settings without granting the
+            // permission. Stay on the explanation + settings/install actions.
+            InstallPermissionState.Denied -> Unit
+            InstallPermissionState.NotDeclared ->
+                _uiState.value =
+                    UpdateUiState.InstallerError(updateErrorMessageRes(UpdateError.PermissionNotDeclared))
         }
     }
 
@@ -227,6 +274,7 @@ class UpdateViewModel(
 
     private fun startDownload(update: UpdateInfo) {
         _uiState.value = UpdateUiState.Downloading(progress = null)
+        verifiedUpdateVersionCode = null
         downloadJob = viewModelScope.launch {
             val apk = stagedApkProvider()
             try {
@@ -241,8 +289,15 @@ class UpdateViewModel(
                 }
                 _uiState.value = UpdateUiState.Verifying
                 when (val result = verifier.verify(apk, update)) {
-                    ApkVerificationResult.Success ->
+                    ApkVerificationResult.Success -> {
+                        verifiedUpdateVersionCode = update.versionCode
                         _uiState.value = UpdateUiState.ReadyToInstall
+                    }
+                    ApkVerificationResult.BelowMinimum -> {
+                        // Too old to self-update; a manual install is required.
+                        deleteStagedApk()
+                        _uiState.value = UpdateUiState.Error(R.string.update_error_too_old)
+                    }
                     else -> {
                         deleteStagedApk()
                         _uiState.value = UpdateUiState.Error(R.string.update_error_verify)
@@ -260,6 +315,7 @@ class UpdateViewModel(
 
     private fun resetToIdle() {
         pendingUpdate = null
+        verifiedUpdateVersionCode = null
         _uiState.value = UpdateUiState.Idle
     }
 
@@ -288,6 +344,8 @@ class UpdateViewModel(
         UpdateError.InstallationPermissionRequired -> R.string.update_error_permission
         UpdateError.PermissionNotDeclared -> R.string.update_error_permission_not_declared
         UpdateError.InstallerLaunch -> R.string.update_error_launch
+        UpdateError.InstallerUnavailable -> R.string.update_error_installer_unavailable
+        UpdateError.BelowMinimum -> R.string.update_error_too_old
         UpdateError.Cancelled -> R.string.update_error_cancelled
     }
 
