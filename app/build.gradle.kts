@@ -48,8 +48,8 @@ android {
         targetSdk = 37
         // versionCode is the authoritative update ordering key. versionName is
         // display-only and normalized to match the v1.0.0 GitHub release.
-        versionCode = 8
-        versionName = "1.1.5"
+        versionCode = 9
+        versionName = "1.1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
