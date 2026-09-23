@@ -48,8 +48,8 @@ android {
         targetSdk = 37
         // versionCode is the authoritative update ordering key. versionName is
         // display-only and normalized to match the v1.0.0 GitHub release.
-        versionCode = 9
-        versionName = "1.1.6"
+        versionCode = 10
+        versionName = "1.1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -109,6 +109,16 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        unitTests.all {
+            // Lets `gradlew -Dtechvision.update.test.apk=<path>` feed the real
+            // production APK to the JVM verification tests; empty when absent.
+            it.systemProperty(
+                "techvision.update.test.apk",
+                System.getProperty("techvision.update.test.apk", ""),
+            )
+        }
+    }
 }
 
 dependencies {
@@ -132,8 +142,16 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // apksig (same codec as build-tools apksigner) verifies the staged update
+    // APK's signing block directly, instead of relying on PackageManager
+    // archive signer parsing that returns empty signers for a valid v2/v3-only
+    // APK on some API levels/ROMs.
+    implementation(libs.apksig)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Self-signed certificate generation for hermetic signing-block tests
+    // (bcpkix transitively provides bcprov).
+    testImplementation(libs.bouncycastle.bcpkix)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

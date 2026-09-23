@@ -5,6 +5,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
+import com.android.apksig.ApkVerifier
 import com.techvisiondz.app.BuildConfig
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +39,7 @@ sealed interface ApkVerificationResult {
     /** The APK signing certificates differ from the installed app's. */
     data object SignatureMismatch : ApkVerificationResult
 
-    /** Signatures could not be read on this device (see implementation notes). */
+    /** Signatures could not be cryptographically verified or read. */
     data object SignatureUnverifiable : ApkVerificationResult
 }
 
@@ -51,18 +52,26 @@ interface UpdateApkVerifier {
 }
 
 /**
- * Android implementation reading package metadata and signing certificates
- * through [PackageManager] archive APIs. The comparison only ever uses the
- * public certificate bytes — the private signing key is not accessible via
+ * Android implementation that reads package metadata through [PackageManager]
+ * archive APIs but verifies the update's signing certificates directly from the
+ * APK's signing block via `apksig` (the same library that powers the
+ * build-tools `apksigner`, running the exact scheme validation the system
+ * installer will run again). The comparison only ever uses the public
+ * certificate bytes — the private signing key is not accessible via any of
  * these APIs and is never touched.
  *
  * Signing certificates are compared only for their public identity:
- *  - API 28+ uses `GET_SIGNING_CERTIFICATES` (v2/v3-aware) for both the
- *    staged APK and the installed package;
- *  - API 26/27 falls back to v1 `GET_SIGNATURES`; an APK with no v1 signature
- *    (e.g. v2/v3-only, the default for recent AGP builds) yields no signers,
- *    which maps to [ApkVerificationResult.SignatureUnverifiable] rather than
- *    pretending the update is safe.
+ *  - the staged APK's certificates come from [apkSigningBlockCertificates],
+ *    which cryptographically verifies the APK's Signature Scheme (v1/v2/v3)
+ *    and returns the DER-encoded X.509 signer certificates byte-for-byte the
+ *    way the installer's `SigningInfo.apkContentsSigners` would report them;
+ *  - the installed app's certificates are read through [PackageManager]
+ *    (API 28+ `GET_SIGNING_CERTIFICATES`, API 26/27 `GET_SIGNATURES`).
+ *
+ * `PackageManager.getPackageArchiveInfo` is deliberately NOT used for the
+ * update APK's signers: on some API levels/ROMs it reports no signers for a
+ * valid APK that is signed only with v2/v3 (the default for recent AGP
+ * builds), which would wrongly abort the update as unverifiable.
  *
  * The decision rules live in pure, JVM-testable functions below.
  */
@@ -101,33 +110,30 @@ class AndroidUpdateApkVerifier(
                 MetadataStatus.BelowMinimum -> return@withContext ApkVerificationResult.BelowMinimum
             }
 
-            when (compareSignatures(readInstalledSigners(), archive.signers)) {
-                SignatureCompare.Match -> ApkVerificationResult.Success
-                SignatureCompare.Mismatch -> ApkVerificationResult.SignatureMismatch
-                SignatureCompare.Unverifiable -> ApkVerificationResult.SignatureUnverifiable
+            when (val apkSigners = apkSigningBlockCertificates(apk)) {
+                is ApkSigners.Verified -> when (compareSignatures(readInstalledSigners(), apkSigners.certificates)) {
+                    SignatureCompare.Match -> ApkVerificationResult.Success
+                    SignatureCompare.Mismatch -> ApkVerificationResult.SignatureMismatch
+                    SignatureCompare.Unverifiable -> ApkVerificationResult.SignatureUnverifiable
+                }
+                ApkSigners.Unverifiable -> ApkVerificationResult.SignatureUnverifiable
             }
         }
 
+    /** Package identity/version metadata only; signers never come from here. */
     private data class ArchiveMetadata(
         val packageName: String?,
         val versionCode: Int?,
         val versionName: String?,
-        val signers: List<ByteArray>,
     )
 
     private fun readArchiveMetadata(apk: File): ArchiveMetadata? {
-        val info: PackageInfo? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageManager.getPackageArchiveInfo(apk.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES)
-        } else {
-            @Suppress("DEPRECATION")
-            packageManager.getPackageArchiveInfo(apk.absolutePath, PackageManager.GET_SIGNATURES)
-        }
+        val info: PackageInfo? = packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
         return info?.let {
             ArchiveMetadata(
                 packageName = it.packageName,
                 versionCode = it.versionCode(),
                 versionName = it.versionName,
-                signers = signersOf(it),
             )
         }
     }
@@ -155,6 +161,55 @@ class AndroidUpdateApkVerifier(
         }
         return signers.orEmpty().map { it.toByteArray() }
     }
+}
+
+/**
+ * Outcome of extracting the staged APK's signing certificates straight from the
+ * APK Signing Block using `apksig` — never from [PackageManager] archive
+ * parsing, which on some API levels/ROMs reports no signers for a valid
+ * v2/v3-only APK.
+ */
+internal sealed interface ApkSigners {
+    /**
+     * The signing block cryptographically verified and [certificates] carries
+     * the DER-encoded X.509 signer certificates — byte-identical to
+     * `android.content.pm.Signature.toByteArray()` for the same certificate,
+     * which is what [compareSignatures] receives for the installed app.
+     */
+    data class Verified(val certificates: List<ByteArray>) : ApkSigners
+
+    /** The signing block could not be verified or contains no certificates. */
+    data object Unverifiable : ApkSigners
+}
+
+/**
+ * Cryptographically verifies the APK's Signature Scheme (v1/v2/v3) in [apk]
+ * with `apksig` — the same verification `apksigner verify` performs and the
+ * system package installer will perform again — and returns the DER-encoded
+ * signer certificates on success.
+ *
+ * [ApkSigners.Verified] is produced only after [ApkVerifier.Result.isVerified];
+ * signers are never reported present on the strength of unverified parsed
+ * bytes. Every failure — missing/unknown scheme, structural problem,
+ * cryptographic mismatch — collapses to [ApkSigners.Unverifiable] so the caller
+ * never treats an unauthenticated APK as signed.
+ */
+internal fun apkSigningBlockCertificates(apk: File): ApkSigners {
+    val result = try {
+        ApkVerifier.Builder(apk).build().verify()
+    } catch (e: Exception) {
+        return ApkSigners.Unverifiable
+    }
+    if (!result.isVerified) return ApkSigners.Unverifiable
+
+    val certificates = ArrayList<ByteArray>(result.signerCertificates.size)
+    for (certificate in result.signerCertificates) {
+        val encoded = runCatching { certificate.encoded }.getOrNull()
+            ?: return ApkSigners.Unverifiable
+        certificates.add(encoded)
+    }
+    if (certificates.isEmpty()) return ApkSigners.Unverifiable
+    return ApkSigners.Verified(certificates)
 }
 
 /** Decision rules for the manifest-vs-APK metadata comparison. */
@@ -198,8 +253,9 @@ internal enum class SignatureCompare { Match, Mismatch, Unverifiable }
 
 /**
  * Compares public signing-certificate byte arrays. Match means any installed
- * signer equals any APK signer; empty sets (e.g. a v2-only APK read on API < 28)
- * are unverifiable, never treated as a match.
+ * signer equals any APK signer; empty sets are unverifiable, never treated as a
+ * match (a missing installed signature — e.g. an API < 28 device reading a
+ * v2-only installed app — must not let a stale or bogus APK through).
  */
 internal fun compareSignatures(installed: List<ByteArray>, apk: List<ByteArray>): SignatureCompare {
     if (installed.isEmpty() || apk.isEmpty()) return SignatureCompare.Unverifiable
