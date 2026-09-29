@@ -2,10 +2,12 @@ package com.techvisiondz.app.feature.home
 
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard
+import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.data.model.AuthorSummary
 import com.techvisiondz.app.core.data.model.Category
 import com.techvisiondz.app.core.data.model.CategorySummary
+import com.techvisiondz.app.core.data.model.DEFAULT_CONTENT_LANGUAGE
 import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagSummary
@@ -39,6 +41,18 @@ class FakeArticleRepository(
 
     /** Article returned by [getArticle]; null means "not found". */
     var detailArticle: Article? = null
+
+    /**
+     * Slug-keyed articles consulted by [getArticle] before [detailArticle],
+     * letting a UI test model per-locale content behind one article.
+     */
+    var articlesBySlug: Map<String, Article> = emptyMap()
+
+    /**
+     * Language versions returned by [getArticleTranslations]. Empty is the
+     * single-language case and is the default.
+     */
+    var articleTranslations: List<ArticleTranslationRef> = emptyList()
 
     var categories: List<Category> = categories
 
@@ -78,8 +92,11 @@ class FakeArticleRepository(
         lastArticleSlug = slug
         lastLanguageCode = languageCode
         error?.let { throw it }
-        return detailArticle
+        return articlesBySlug[slug] ?: detailArticle
     }
+
+    override suspend fun getArticleTranslations(articleId: String): List<ArticleTranslationRef> =
+        articleTranslations
 
     override suspend fun getCategories(languageCode: String): List<Category> {
         lastLanguageCode = languageCode
@@ -178,6 +195,8 @@ fun sampleArticle(
     coverUrl: String? = null,
     video: VideoRef? = null,
     software: SoftwareSummary? = null,
+    languageCode: String = DEFAULT_CONTENT_LANGUAGE,
+    availableLanguages: List<ArticleTranslationRef> = emptyList(),
 ) = Article(
     id = "article-$slug",
     slug = slug,
@@ -195,4 +214,6 @@ fun sampleArticle(
     coverAlt = null,
     video = video,
     software = software,
+    languageCode = languageCode,
+    availableLanguages = availableLanguages,
 )

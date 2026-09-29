@@ -2,10 +2,12 @@ package com.techvisiondz.app.feature.home
 
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard
+import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.data.model.AuthorSummary
 import com.techvisiondz.app.core.data.model.Category
 import com.techvisiondz.app.core.data.model.CategorySummary
+import com.techvisiondz.app.core.data.model.DEFAULT_CONTENT_LANGUAGE
 import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagSummary
@@ -44,8 +46,36 @@ class FakeArticleRepository(
     var lastArticleDetailSlug: String? = null
         private set
 
+    /**
+     * Language passed to [getArticle] specifically. Tracked separately from
+     * [lastLanguageCode] because related-article and catalog calls also write
+     * that field, which would otherwise mask the detail request's locale.
+     */
+    var lastDetailLanguageCode: String? = null
+        private set
+
     /** Article returned by [getArticle]; null means "not found". */
     var detailArticle: Article? = null
+
+    /**
+     * Slug-keyed articles consulted by [getArticle] before [detailArticle].
+     * Lets a test model an article that resolves to different content per
+     * locale, the way the backend's per-translation slugs behave.
+     */
+    var articlesBySlug: Map<String, Article> = emptyMap()
+
+    /**
+     * Language versions returned by [getArticleTranslations]. Empty is the
+     * single-language case and is the default, so existing tests keep exercising
+     * the "no selector" path.
+     */
+    var articleTranslations: List<ArticleTranslationRef> = emptyList()
+
+    /** When set, [getArticleTranslations] throws it instead of returning rows. */
+    var translationsError: Exception? = null
+
+    var lastTranslationsArticleId: String? = null
+        private set
 
     var categories: List<Category> = categories
 
@@ -111,9 +141,16 @@ class FakeArticleRepository(
     override suspend fun getArticle(slug: String, languageCode: String): Article? {
         lastArticleSlug = slug
         lastArticleDetailSlug = slug
+        lastDetailLanguageCode = languageCode
         lastLanguageCode = languageCode
         error?.let { throw it }
-        return detailArticle
+        return articlesBySlug[slug] ?: detailArticle
+    }
+
+    override suspend fun getArticleTranslations(articleId: String): List<ArticleTranslationRef> {
+        lastTranslationsArticleId = articleId
+        translationsError?.let { throw it }
+        return articleTranslations
     }
 
     override suspend fun getCategories(languageCode: String): List<Category> {
@@ -215,6 +252,8 @@ fun sampleArticle(
     tags: List<TagSummary> = listOf(TagSummary(slug = "ai", label = "AI")),
     coverUrl: String? = null,
     software: SoftwareSummary? = null,
+    languageCode: String = DEFAULT_CONTENT_LANGUAGE,
+    availableLanguages: List<ArticleTranslationRef> = emptyList(),
 ) = Article(
     id = "article-$slug",
     slug = slug,
@@ -232,4 +271,6 @@ fun sampleArticle(
     coverAlt = null,
     video = null,
     software = software,
+    languageCode = languageCode,
+    availableLanguages = availableLanguages,
 )

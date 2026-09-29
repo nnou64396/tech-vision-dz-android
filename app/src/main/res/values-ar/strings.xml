@@ -20,6 +20,14 @@
     <string name="article_video_error">تعذر فتح الفيديو. تحقق من المتصفح وحاول مرة أخرى</string>
     <string name="related_articles_title">المزيد من TECH VISION DZ</string>
     <string name="related_articles_error">تعذر تحميل المقالات ذات الصلة</string>
+    <!-- Article language versions. Each language keeps its own endonym so the
+         four version names read identically in every UI locale; only the group
+         label below is translated. -->
+    <string name="article_language_label">لغة المقال</string>
+    <string name="article_language_darija">🇩🇿 Darija</string>
+    <string name="article_language_arabic">🇸🇦 العربية</string>
+    <string name="article_language_french">🇫🇷 Français</string>
+    <string name="article_language_english">🇬🇧 English</string>
     <string name="share_article">مشاركة المقال</string>
     <plurals name="reading_time_minutes">
         <item quantity="zero">٠ دقائق للقراءة</item>

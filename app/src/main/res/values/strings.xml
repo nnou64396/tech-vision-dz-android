@@ -19,6 +19,14 @@
     <string name="article_video_error">Could not open the video. Check your browser and try again</string>
     <string name="related_articles_title">More from TECH VISION DZ</string>
     <string name="related_articles_error">Could not load related articles</string>
+    <!-- Article language versions. Each language is labelled in its own
+         language, which is why these four values are identical in values/
+         and values-ar/; only the group label below is translated. -->
+    <string name="article_language_label">Article language</string>
+    <string name="article_language_darija">🇩🇿 Darija</string>
+    <string name="article_language_arabic">🇸🇦 العربية</string>
+    <string name="article_language_french">🇫🇷 Français</string>
+    <string name="article_language_english">🇬🇧 English</string>
     <string name="share_article">Share article</string>
     <plurals name="reading_time_minutes">
         <item quantity="one">%d minute read</item>

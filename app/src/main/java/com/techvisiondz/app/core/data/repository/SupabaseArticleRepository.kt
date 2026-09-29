@@ -7,6 +7,8 @@ import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.data.model.ArticleCardRpcDoc
 import com.techvisiondz.app.core.data.model.ArticleFeedRow
 import com.techvisiondz.app.core.data.model.ArticleRpcDoc
+import com.techvisiondz.app.core.data.model.ArticleTranslationIndexRow
+import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.data.model.AuthorFeedRow
 import com.techvisiondz.app.core.data.model.Category
@@ -18,6 +20,7 @@ import com.techvisiondz.app.core.data.model.toArticleCard
 import com.techvisiondz.app.core.data.model.toAuthor
 import com.techvisiondz.app.core.data.model.toCategory
 import com.techvisiondz.app.core.data.model.toTag
+import com.techvisiondz.app.core.data.model.toTranslationRefs
 import com.techvisiondz.app.core.network.SupabaseClientProvider
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.query.Columns
@@ -34,6 +37,9 @@ import kotlinx.serialization.json.put
  * - Feed: relational PostgREST query against `articles` (published only,
  *   `published_at` desc), exactly like the website's `getPublishedArticles`.
  * - Detail: `get_published_article_by_slug` RPC (migrations 0037/0039).
+ * - Language versions: a narrow read of `article_translations` by article id,
+ *   because the detail RPC resolves exactly one translation and cannot report
+ *   the others. No new RPC, endpoint or backend change is involved.
  *
  * All network/backend errors are converted to [com.techvisiondz.app.core.data.DataException].
  */
@@ -76,6 +82,18 @@ class SupabaseArticleRepository(
         val doc = decodeArticleRpcBody(result.data) { result.decodeAs<ArticleRpcDoc>() }
             ?: return@runTranslated null
         doc.toArticle(languageCode, ::resolvePublicUrl)
+    }
+
+    override suspend fun getArticleTranslations(articleId: String): List<ArticleTranslationRef> {
+        if (articleId.isBlank()) return emptyList()
+        return runTranslated {
+            postgrest.from("article_translations")
+                .select(Columns.raw(TRANSLATION_INDEX_SELECT)) {
+                    filter { eq("article_id", articleId) }
+                }
+                .decodeList<ArticleTranslationIndexRow>()
+                .toTranslationRefs()
+        }
     }
 
     override suspend fun getCategories(languageCode: String): List<Category> = runTranslated {
@@ -186,6 +204,14 @@ class SupabaseArticleRepository(
         const val GET_PUBLISHED_ARTICLE_CARDS_BY_CATEGORY = "get_published_article_cards_by_category"
         const val GET_PUBLISHED_ARTICLE_CARDS_BY_AUTHOR = "get_published_article_cards_by_author"
         const val GET_PUBLISHED_ARTICLE_CARDS_BY_TAG = "get_published_article_cards_by_tag"
+
+        // Minimal projection of `article_translations` used to discover which
+        // language versions of one article actually exist, and the slug each
+        // one is published under. Read-only and locale-agnostic on purpose: the
+        // filter is by article id, never by language, so no translation is
+        // hidden by the query itself. `article_id` is selected only to keep the
+        // mapper's input shape complete; the row filter already guarantees it.
+        const val TRANSLATION_INDEX_SELECT = "article_id, language_code, slug"
 
         const val CATEGORY_LIST_SELECT = """
             id,

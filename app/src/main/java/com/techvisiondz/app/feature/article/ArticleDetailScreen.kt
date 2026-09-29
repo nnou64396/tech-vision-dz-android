@@ -36,27 +36,35 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard as ArticleCardModel
+import com.techvisiondz.app.core.data.model.ArticleLocales
+import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.UiState
@@ -107,6 +115,14 @@ import kotlinx.coroutines.launch
  * `http`/`https`, the launch is guarded against an unhandled intent (which
  * would otherwise crash the screen) and a failed launch surfaces a localized
  * snackbar. [onOpenVideo] mirrors [onDownloadClick] as a test seam.
+ *
+ * When the article is published in more than one language, a selector lists
+ * exactly the versions that exist (never a fixed set, never a placeholder for
+ * a missing translation) and tapping one asks the view model to swap in that
+ * version of the same article. A single-language article shows no selector at
+ * all. The article body is wrapped in a layout-direction provider driven by the
+ * active content language, so Darija and Fusha lay out RTL while French and
+ * English lay out LTR regardless of the app's own UI language.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,6 +140,7 @@ fun ArticleDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     val relatedState by viewModel.relatedArticles.collectAsState()
+    val isSwitchingLanguage by viewModel.isSwitchingLanguage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val downloadFailureMessage = stringResource(R.string.software_download_error)
     val videoFailureMessage = stringResource(R.string.article_video_error)
@@ -212,6 +229,8 @@ fun ArticleDetailScreen(
                     article = state.data,
                     saveError = saveState.error,
                     relatedState = relatedState,
+                    isSwitchingLanguage = isSwitchingLanguage,
+                    onSelectLanguage = viewModel::selectLanguage,
                     onRelatedArticleClick = onRelatedArticleClick ?: {},
                     onTagClick = onTagClick,
                     onOpenDownload = openDownload,
@@ -459,6 +478,8 @@ private fun ArticleDetailContent(
     article: Article,
     saveError: AuthError?,
     relatedState: UiState<List<ArticleCardModel>>,
+    isSwitchingLanguage: Boolean,
+    onSelectLanguage: (String) -> Unit,
     onRelatedArticleClick: (String) -> Unit,
     onTagClick: ((String) -> Unit)?,
     onOpenDownload: (String) -> Unit,
@@ -466,195 +487,295 @@ private fun ArticleDetailContent(
 ) {
     val placeholderColor = MaterialTheme.colorScheme.surfaceContainerHighest
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = TechVisionSpacing.Lg)
-            .padding(top = TechVisionSpacing.Md, bottom = TechVisionSpacing.Xl),
-        verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
-    ) {
-        if (saveError != null) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.errorContainer,
-            ) {
+    // Text direction follows the article's own content language, not the app's
+    // UI language: an English article read by an Arabic-locale user must still
+    // lay out LTR. Scoped to the body so the top bar keeps its existing,
+    // app-level direction.
+    val layoutDirection = if (ArticleLocales.isRtl(article.languageCode)) {
+        LayoutDirection.Rtl
+    } else {
+        LayoutDirection.Ltr
+    }
+
+    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = TechVisionSpacing.Lg)
+                .padding(top = TechVisionSpacing.Md, bottom = TechVisionSpacing.Xl),
+            verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+        ) {
+            if (saveError != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                ) {
+                    Text(
+                        text = stringResource(saveError.messageRes),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(TechVisionSpacing.Md),
+                    )
+                }
+            }
+            article.coverUrl?.let { coverUrl ->
+                AsyncImage(
+                    model = coverUrl,
+                    contentDescription = article.coverAlt ?: article.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(TechVisionRadii.Lg)),
+                    contentScale = ContentScale.Crop,
+                    placeholder = ColorPainter(placeholderColor),
+                    error = ColorPainter(placeholderColor),
+                )
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+            }
+
+            article.category?.name?.takeIf { it.isNotBlank() }?.let { CategoryChip(label = it) }
+
+            Text(
+                text = article.title,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+
+            // Only rendered when a second version actually exists, so the common
+            // single-language article looks exactly as it did before.
+            ArticleLanguageSelector(
+                article = article,
+                isSwitching = isSwitchingLanguage,
+                onSelect = onSelectLanguage,
+            )
+
+            // Compact author identity: a ringed avatar when the backend provides a
+            // valid HTTPS URL and a short bio when present, both rendered only with
+            // data the article already carries. Without either, nothing is shown and
+            // the screen falls back to the plain author-name metadata pill below.
+            article.author?.let { author ->
+                val avatarUrl = author.avatarUrl?.takeIf { it.startsWith("https://") }
+                val bio = author.bio?.takeIf { it.isNotBlank() }
+                if (avatarUrl != null || bio != null) {
+                    Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        avatarUrl?.let { url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = author.name,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                                placeholder = ColorPainter(placeholderColor),
+                                error = ColorPainter(placeholderColor),
+                            )
+                            Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = author.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                            bio?.let { text ->
+                                Text(
+                                    text = text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+                }
+            }
+
+            val meta = buildList {
+                article.author?.name?.takeIf { it.isNotBlank() }?.let(::add)
+                article.category?.name?.takeIf { it.isNotBlank() }?.let(::add)
+                val date = formatPublishedAt(article.publishedAt)
+                if (date.isNotBlank()) add(date)
+            }.joinToString(" · ")
+            if (meta.isNotBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(TechVisionRadii.Md),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = TechVisionSpacing.Lg, vertical = TechVisionSpacing.Md),
+                    )
+                }
+            }
+
+            val details = buildList {
+                article.readingTimeMinutes?.takeIf { it > 0 }?.let { minutes ->
+                    add(pluralStringResource(R.plurals.reading_time_minutes, minutes, minutes))
+                }
+                add(stringResource(R.string.article_views, formatViewsCount(article.viewsCount)))
+            }.joinToString(" · ")
+            if (details.isNotBlank()) {
                 Text(
-                    text = stringResource(saveError.messageRes),
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    text = details,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(TechVisionSpacing.Md),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        article.coverUrl?.let { coverUrl ->
-            AsyncImage(
-                model = coverUrl,
-                contentDescription = article.coverAlt ?: article.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(TechVisionRadii.Lg)),
-                contentScale = ContentScale.Crop,
-                placeholder = ColorPainter(placeholderColor),
-                error = ColorPainter(placeholderColor),
-            )
-            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
-        }
 
-        article.category?.name?.takeIf { it.isNotBlank() }?.let { CategoryChip(label = it) }
-
-        Text(
-            text = article.title,
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-
-        // Compact author identity: a ringed avatar when the backend provides a
-        // valid HTTPS URL and a short bio when present, both rendered only with
-        // data the article already carries. Without either, nothing is shown and
-        // the screen falls back to the plain author-name metadata pill below.
-        article.author?.let { author ->
-            val avatarUrl = author.avatarUrl?.takeIf { it.startsWith("https://") }
-            val bio = author.bio?.takeIf { it.isNotBlank() }
-            if (avatarUrl != null || bio != null) {
+            article.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
                 Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    avatarUrl?.let { url ->
-                        AsyncImage(
-                            model = url,
-                            contentDescription = author.name,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop,
-                            placeholder = ColorPainter(placeholderColor),
-                            error = ColorPainter(placeholderColor),
-                        )
-                        Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = author.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                        )
-                        bio?.let { text ->
+                Text(
+                    text = excerpt,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            val bodySpanned = htmlBodySpanned(article.body)
+            if (bodySpanned != null && bodySpanned.isNotBlank()) {
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
+                Text(
+                    text = spannedToAnnotatedString(
+                        spanned = bodySpanned,
+                        linkColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontSize = 17.sp,
+                        lineHeight = 32.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+
+            article.video?.takeIf { VideoUrlPolicy.isSafe(it.url) }?.let { video ->
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+                VideoPreviewCard(video = video, onOpen = onOpenVideo)
+            }
+
+            if (article.tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+                    verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+                ) {
+                    article.tags.forEach { tag ->
+                        Surface(
+                            onClick = { onTagClick?.invoke(tag.slug) },
+                            enabled = onTagClick != null,
+                            shape = TechVisionRadii.Full,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        ) {
                             Text(
-                                text = text,
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = tag.label,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = TechVisionSpacing.Md, vertical = 6.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
             }
-        }
 
-        val meta = buildList {
-            article.author?.name?.takeIf { it.isNotBlank() }?.let(::add)
-            article.category?.name?.takeIf { it.isNotBlank() }?.let(::add)
-            val date = formatPublishedAt(article.publishedAt)
-            if (date.isNotBlank()) add(date)
-        }.joinToString(" · ")
-        if (meta.isNotBlank()) {
-            Surface(
-                shape = RoundedCornerShape(TechVisionRadii.Md),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            ) {
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = TechVisionSpacing.Lg, vertical = TechVisionSpacing.Md),
-                )
-            }
-        }
-
-        val details = buildList {
-            article.readingTimeMinutes?.takeIf { it > 0 }?.let { minutes ->
-                add(pluralStringResource(R.plurals.reading_time_minutes, minutes, minutes))
-            }
-            add(stringResource(R.string.article_views, formatViewsCount(article.viewsCount)))
-        }.joinToString(" · ")
-        if (details.isNotBlank()) {
-            Text(
-                text = details,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            RelatedArticlesSection(
+                state = relatedState,
+                onArticleClick = onRelatedArticleClick,
             )
-        }
 
-        article.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
-            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
-            Text(
-                text = excerpt,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        val bodySpanned = htmlBodySpanned(article.body)
-        if (bodySpanned != null && bodySpanned.isNotBlank()) {
-            Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
-            Text(
-                text = spannedToAnnotatedString(
-                    spanned = bodySpanned,
-                    linkColor = MaterialTheme.colorScheme.primary,
-                ),
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontSize = 17.sp,
-                    lineHeight = 32.sp,
-                ),
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
-
-        article.video?.takeIf { VideoUrlPolicy.isSafe(it.url) }?.let { video ->
-            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
-            VideoPreviewCard(video = video, onOpen = onOpenVideo)
-        }
-
-        if (article.tags.isNotEmpty()) {
-            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
-                verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
-            ) {
-                article.tags.forEach { tag ->
-                    Surface(
-                        onClick = { onTagClick?.invoke(tag.slug) },
-                        enabled = onTagClick != null,
-                        shape = TechVisionRadii.Full,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    ) {
-                        Text(
-                            text = tag.label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = TechVisionSpacing.Md, vertical = 6.dp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+            article.software?.let { software ->
+                Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
+                SoftwareDownloadCard(software = software, onOpenDownload = onOpenDownload)
             }
-        }
-
-        RelatedArticlesSection(
-            state = relatedState,
-            onArticleClick = onRelatedArticleClick,
-        )
-
-        article.software?.let { software ->
-            Spacer(modifier = Modifier.size(TechVisionSpacing.Md))
-            SoftwareDownloadCard(software = software, onOpenDownload = onOpenDownload)
         }
     }
 }
+
+/**
+ * Language-version selector for an article.
+ *
+ * Renders nothing at all unless the article has more than one published
+ * version, so there is never a one-option control or a placeholder for a
+ * translation that does not exist. The chip list mirrors the existing tag-pill
+ * `FlowRow` idiom, which is what lets it stay native to the current UI and
+ * wrap cleanly on narrow screens. While a switch is in flight the chips are
+ * disabled and dimmed, but the article underneath stays interactive — the
+ * selector never blanks the page.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ArticleLanguageSelector(
+    article: Article,
+    isSwitching: Boolean,
+    onSelect: (String) -> Unit,
+) {
+    val versions = article.availableLanguages
+    if (versions.size <= 1) return
+
+    // Each chip already announces its own language name; this gives the group
+    // itself a name so the control is not announced as a bare row of chips.
+    val groupLabel = stringResource(R.string.article_language_label)
+    Spacer(modifier = Modifier.size(TechVisionSpacing.Xs))
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = groupLabel }
+            .testTag("article_language_selector"),
+        horizontalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+        verticalArrangement = Arrangement.spacedBy(TechVisionSpacing.Sm),
+    ) {
+        versions.forEach { version ->
+            val selected = version.languageCode == article.languageCode
+            val label = stringResource(version.labelRes())
+            Surface(
+                onClick = { onSelect(version.languageCode) },
+                enabled = !selected && !isSwitching,
+                shape = TechVisionRadii.Full,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                },
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier
+                    .alpha(if (isSwitching && !selected) 0.5f else 1f)
+                    .testTag(version.testTag()),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = TechVisionSpacing.Md, vertical = 6.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+    Spacer(modifier = Modifier.size(TechVisionSpacing.Xs))
+}
+
+/** Localized label for a content locale. Only supported locales reach the UI. */
+private fun ArticleTranslationRef.labelRes(): Int = when (languageCode) {
+    ArticleLocales.DARIJA -> R.string.article_language_darija
+    ArticleLocales.ARABIC -> R.string.article_language_arabic
+    ArticleLocales.FRENCH -> R.string.article_language_french
+    else -> R.string.article_language_english
+}
+
+/** Stable test tag per language chip, e.g. `article_language_fr`. */
+private fun ArticleTranslationRef.testTag(): String = "article_language_$languageCode"

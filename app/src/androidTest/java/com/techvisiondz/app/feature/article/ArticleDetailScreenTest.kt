@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollTo
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.data.DataException
 import com.techvisiondz.app.core.data.model.Article
+import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.formatViewsCount
@@ -534,5 +535,178 @@ class ArticleDetailScreenTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithContentDescription("محرر TECH VISION DZ").assertDoesNotExist()
+    }
+
+    // ---------------------------------------------------------------------
+    // Language selector
+    // ---------------------------------------------------------------------
+
+    @Test
+    fun selectorShowsEveryPublishedVersionForAFullyTranslatedArticle() {
+        val viewModel = ArticleDetailViewModel(
+            repository = multilingualRepository(),
+            slug = SLUG_ARQ,
+        )
+
+        setContent(viewModel)
+
+        composeRule.onNodeWithTag("article_language_selector").assertExists()
+        listOf("arq", "ar", "fr", "en").forEach {
+            composeRule.onNodeWithTag("article_language_$it").assertExists()
+        }
+        // Each version is labelled with its own name, flag included.
+        composeRule.onNodeWithText(activity.getString(R.string.article_language_darija)).assertExists()
+        composeRule.onNodeWithText(activity.getString(R.string.article_language_french)).assertExists()
+    }
+
+    @Test
+    fun selectorShowsOnlyTheTwoVersionsThatExist() {
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply {
+                detailArticle = versionIn("arq", SLUG_ARQ, "عنوان بالدارجة")
+                articleTranslations = listOf(
+                    ArticleTranslationRef("arq", SLUG_ARQ),
+                    ArticleTranslationRef("ar", SLUG_AR),
+                )
+            },
+            slug = SLUG_ARQ,
+        )
+
+        setContent(viewModel)
+
+        composeRule.onNodeWithTag("article_language_arq").assertExists()
+        composeRule.onNodeWithTag("article_language_ar").assertExists()
+        composeRule.onNodeWithTag("article_language_fr").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_language_en").assertDoesNotExist()
+    }
+
+    @Test
+    fun selectorIsAbsentForASingleLanguageArticle() {
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply {
+                detailArticle = versionIn("arq", SLUG_ARQ, "مقال بالدارجة فقط")
+                articleTranslations = listOf(ArticleTranslationRef("arq", SLUG_ARQ))
+            },
+            slug = SLUG_ARQ,
+        )
+
+        setContent(viewModel)
+
+        composeRule.onNodeWithText("مقال بالدارجة فقط").assertIsDisplayed()
+        composeRule.onNodeWithTag("article_language_selector").assertDoesNotExist()
+        composeRule.onNodeWithTag("article_language_arq").assertDoesNotExist()
+    }
+
+    @Test
+    fun selectorIsAbsentWhenTheArticleHasNoTranslationMetadata() {
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply {
+                detailArticle = versionIn("arq", SLUG_ARQ, "مقال قديم")
+                articleTranslations = emptyList()
+            },
+            slug = SLUG_ARQ,
+        )
+
+        setContent(viewModel)
+
+        composeRule.onNodeWithText("مقال قديم").assertIsDisplayed()
+        composeRule.onNodeWithTag("article_language_selector").assertDoesNotExist()
+    }
+
+    @Test
+    fun tappingAVersionShowsThatVersionOfTheSameArticle() {
+        val viewModel = ArticleDetailViewModel(
+            repository = multilingualRepository(),
+            slug = SLUG_ARQ,
+        )
+        setContent(viewModel)
+        composeRule.onNodeWithText("MediaTek تكشف عن المعالج").assertExists()
+
+        composeRule.onNodeWithTag("article_language_fr").performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("MediaTek dévoile le processeur").assertExists()
+        composeRule.onNodeWithText("MediaHex unveils the processor").assertDoesNotExist()
+    }
+
+    @Test
+    fun anUnavailableVersionLeavesTheArticleOnScreen() {
+        val viewModel = ArticleDetailViewModel(
+            repository = FakeArticleRepository().apply {
+                detailArticle = versionIn("arq", SLUG_ARQ, "مقال بالدارجة")
+                articleTranslations = listOf(
+                    ArticleTranslationRef("arq", SLUG_ARQ),
+                    ArticleTranslationRef("fr", SLUG_FR),
+                )
+            },
+            slug = SLUG_ARQ,
+        )
+        setContent(viewModel)
+
+        composeRule.onNodeWithTag("article_language_fr").performClick()
+        composeRule.waitForIdle()
+
+        // The fake falls back to the Darija article, so nothing blanked out and
+        // no "not found" state replaced the content.
+        composeRule.onNodeWithText("مقال بالدارجة").assertIsDisplayed()
+        composeRule.onNodeWithText(activity.getString(R.string.article_not_found)).assertDoesNotExist()
+    }
+
+    @Test
+    fun theSelectorStaysUsableAfterSwitchingToAnLtrVersion() {
+        val viewModel = ArticleDetailViewModel(
+            repository = multilingualRepository(),
+            slug = SLUG_ARQ,
+        )
+        setContent(viewModel)
+
+        // The RTL -> LTR mapping itself is pinned in ArticleLocaleTest
+        // (ArticleLocales.isRtl); Compose's test API cannot observe a composition
+        // local, so this covers what is observable: the LTR version renders and
+        // the control remains interactive, letting the reader switch back.
+        composeRule.onNodeWithTag("article_language_en").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("MediaHex unveils the processor").assertExists()
+
+        composeRule.onNodeWithTag("article_language_arq").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("MediaTek تكشف عن المعالج").assertExists()
+    }
+
+    private fun setContent(viewModel: ArticleDetailViewModel) {
+        composeRule.setContent { TechVisionDzTheme { ArticleDetailScreen(viewModel = viewModel, onBack = {}) } }
+        composeRule.waitForIdle()
+    }
+
+    private val activity: ComponentActivity get() = composeRule.activity
+
+    /** One locale of an article published in all four languages. */
+    private fun versionIn(language: String, slug: String, title: String) = sampleArticle(
+        slug = slug,
+        title = title,
+        languageCode = language,
+    ).copy(id = "article-mediatek")
+
+    private fun multilingualRepository() = FakeArticleRepository().apply {
+        articleTranslations = listOf(
+            ArticleTranslationRef("arq", SLUG_ARQ),
+            ArticleTranslationRef("ar", SLUG_AR),
+            ArticleTranslationRef("fr", SLUG_FR),
+            ArticleTranslationRef("en", SLUG_EN),
+        )
+        articlesBySlug = mapOf(
+            SLUG_ARQ to versionIn("arq", SLUG_ARQ, "MediaTek تكشف عن المعالج"),
+            SLUG_AR to versionIn("ar", SLUG_AR, "MediaTek تكشف عن المعالج رسميا"),
+            SLUG_FR to versionIn("fr", SLUG_FR, "MediaTek dévoile le processeur"),
+            SLUG_EN to versionIn("en", SLUG_EN, "MediaHex unveils the processor"),
+        )
+        detailArticle = versionIn("arq", SLUG_ARQ, "MediaTek تكشف عن المعالج")
+    }
+
+    private companion object {
+        const val SLUG_ARQ = "mediatek-darija-slug"
+        const val SLUG_AR = "mediatek-fusha-slug"
+        const val SLUG_FR = "mediatek-french-slug"
+        const val SLUG_EN = "mediatek-english-slug"
     }
 }

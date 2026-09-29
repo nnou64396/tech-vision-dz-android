@@ -4,6 +4,7 @@ import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard
 import com.techvisiondz.app.core.data.model.Author
+import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.Category
 import com.techvisiondz.app.core.data.model.Tag
 
@@ -31,8 +32,29 @@ interface ArticleRepository {
     /**
      * Loads a single published article by slug via the backend RPC. Returns null
      * when no published article with that slug + language exists.
+     *
+     * Note the slug is the *translation* slug, so it is locale-specific: the
+     * same article has a different slug per language. Callers switching
+     * languages must resolve the target slug through
+     * [getArticleTranslations] first.
      */
     suspend fun getArticle(slug: String, languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE): Article?
+
+    /**
+     * Lists the language versions actually published for [articleId], each with
+     * the slug that version is published under.
+     *
+     * This is the discovery step behind the article language selector: the
+     * detail RPC resolves a single translation and cannot report the other
+     * locales, so they are read from the same `article_translations` rows the
+     * feed already embeds. It is data-driven — a newly published translation
+     * shows up with no client change and no hardcoded per-article mapping.
+     *
+     * Returns an empty list when the article has no other translation (the
+     * common case) or when the metadata cannot be read; callers treat empty as
+     * "single-language article" and hide the selector rather than failing.
+     */
+    suspend fun getArticleTranslations(articleId: String): List<ArticleTranslationRef>
 
     /** Loads the discoverable categories for [languageCode]. */
     suspend fun getCategories(languageCode: String = AppConfig.DEFAULT_LANGUAGE_CODE): List<Category>

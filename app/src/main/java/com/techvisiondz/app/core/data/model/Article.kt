@@ -10,6 +10,13 @@ private const val AVATAR_BUCKET = "avatars"
  * Full, locale-aware article returned by the `get_published_article_by_slug`
  * RPC (migrations 0037/0039). Kept deliberately close to the website's public
  * shapes so a future article-details screen maps 1:1.
+ *
+ * [languageCode] is the locale this particular version was rendered in, taken
+ * from the translation the RPC resolved — it is never inferred from the text.
+ * [availableLanguages] lists the locales actually published for the same
+ * article, in selector order; the UI shows a language selector only when it
+ * holds more than one entry, so a single-language article needs no special
+ * casing anywhere downstream.
  */
 data class Article(
     val id: String,
@@ -28,7 +35,19 @@ data class Article(
     val coverAlt: String?,
     val video: VideoRef?,
     val software: SoftwareSummary?,
+    val languageCode: String = DEFAULT_CONTENT_LANGUAGE,
+    val availableLanguages: List<ArticleTranslationRef> = emptyList(),
 )
+
+/**
+ * Locale assumed when nothing better is known, mirroring
+ * [com.techvisiondz.app.core.config.AppConfig.DEFAULT_LANGUAGE_CODE].
+ *
+ * Only a fallback for articles fetched before the locale was recorded; every
+ * production path populates [Article.languageCode] from the resolved
+ * translation.
+ */
+const val DEFAULT_CONTENT_LANGUAGE: String = "arq"
 
 data class CategorySummary(
     val slug: String,
@@ -172,6 +191,9 @@ fun ArticleRpcDoc.toArticle(
         coverUrl = cover?.resolveUrl(resolvePublicUrl),
         coverAlt = cover?.alt,
         video = video?.toVideoRef(resolvePublicUrl),
+        // Recorded from the translation the RPC actually resolved, so the UI
+        // never has to guess which locale it is looking at.
+        languageCode = t.languageCode,
         software = software?.takeIf { !it.name.isNullOrBlank() }?.let {
             SoftwareSummary(
                 name = it.name!!,
