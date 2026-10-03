@@ -1,11 +1,17 @@
 package com.techvisiondz.app.feature.update
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 /**
  * App-level host for [UpdateDialog].
@@ -18,23 +24,11 @@ import androidx.compose.ui.Modifier
  *
  * Opening the "install unknown apps" system settings page happens here —
  * explicitly, from the dialog's Open settings button and only when the
- * ViewModel reports [UpdateUiState.InstallationPermissionRequired] — and never
- * inside the ViewModel or dialog. The launch goes through an Activity Result
- * contract so control returning from Settings invokes
- * [UpdateViewModel.onPermissionSettingsReturned], which re-probes the
- * permission and resumes the flow (the verified staged APK is kept, never
- * re-downloaded). The final install itself always remains a separate,
- * user-initiated Install tap.
- *
- * The Activity Result launcher is *not* registered at the root of this
- * composable's composition. It is only composed while the dialog is actually in
- * [UpdateUiState.InstallationPermissionRequired], so no `ActivityResultRegistryOwner`
- * is required during the app's initial composition — on some Android 16
- * (API 36) devices registering a launcher at startup throws
- * `IllegalStateException: No ActivityResultRegistryOwner was provided via
- * LocalActivityResultRegistryOwner`. Because the launcher remains composed for
- * the whole settings round-trip (nothing changes the state while the user is in
- * Settings), the Activity Result still reaches the ViewModel on return.
+ * ViewModel reports [UpdateUiState.InstallationPermissionRequired]. Since
+ * Settings returns no result data, the host observes the next lifecycle resume
+ * and asks the ViewModel to re-probe permission. The verified staged APK is
+ * kept, never re-downloaded, and installation remains a separate,
+ * user-initiated action.
  */
 @Composable
 fun UpdateDialogHost(
@@ -58,36 +52,35 @@ fun UpdateDialogHost(
 /**
  * The "Open settings" action for the install-unknown-apps permission detour,
  * or a no-op when the dialog is not in [UpdateUiState.InstallationPermissionRequired].
- *
- * The [rememberLauncherForActivityResult] call lives only inside the
- * [UpdateUiState.InstallationPermissionRequired] branch of this conditional.
- * Compose scopes the remembered launcher to that conditional group: it is
- * registered when the branch is composed and unregistered (by the API's own
- * internal `DisposableEffect`) when the branch leaves composition. This is the
- * Compose-legal way to delay launcher registration — the launcher is registered
- * exactly for the setting's round-trip that can actually deliver a result, and
- * it never exists during startup composition when the owner may be absent.
  */
 @Composable
 private fun rememberPermissionSettingsOpenAction(
     updateViewModel: UpdateViewModel,
     state: UpdateUiState,
 ): () -> Unit {
-    val onOpenSettings: () -> Unit
-    if (state is UpdateUiState.InstallationPermissionRequired) {
-        val settingsLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.StartActivityForResult(),
-        ) {
-            updateViewModel.onPermissionSettingsReturned()
-        }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var awaitingSettingsReturn by remember(updateViewModel) { mutableStateOf(false) }
 
-        onOpenSettings = {
+    DisposableEffect(lifecycleOwner, updateViewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && awaitingSettingsReturn) {
+                awaitingSettingsReturn = false
+                updateViewModel.onPermissionSettingsReturned()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    return if (state is UpdateUiState.InstallationPermissionRequired) {
+        {
             updateViewModel.appSourceSettingsIntent()?.let { intent ->
-                settingsLauncher.launch(intent)
+                context.startActivity(intent)
+                awaitingSettingsReturn = true
             }
         }
     } else {
-        onOpenSettings = {}
+        {}
     }
-    return onOpenSettings
 }
