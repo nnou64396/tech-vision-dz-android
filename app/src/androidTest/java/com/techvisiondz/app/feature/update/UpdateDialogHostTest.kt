@@ -2,15 +2,21 @@ package com.techvisiondz.app.feature.update
 
 import android.app.Application
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.performClick
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.test.core.app.ApplicationProvider
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.update.ApkVerificationResult
@@ -37,12 +43,9 @@ import org.junit.Test
  * and must not crash that first composition. Regression of the v1.1.5 startup
  * crash on Android 16 (API 36) devices:
  * `IllegalStateException: No ActivityResultRegistryOwner was provided via
- * LocalActivityResultRegistryOwner` — thrown by the unconditional
- * `rememberLauncherForActivityResult` that used to live at the root of this
- * composable. The launcher is only ever needed while the dialog shows the
- * "install unknown apps" settings detour
- * ([UpdateUiState.InstallationPermissionRequired]), so the fix registers it
- * conditionally, only in that state.
+ * LocalActivityResultRegistryOwner` on the install-source permission path.
+ * Settings returns no result data, so the host now rechecks permission when
+ * the app resumes rather than registering an Activity Result launcher.
  */
 class UpdateDialogHostTest {
 
@@ -78,7 +81,7 @@ class UpdateDialogHostTest {
             ApkVerificationResult.Success
     }
 
-    private class FakeUpdateInstaller(private val permission: InstallPermissionState) :
+    private class FakeUpdateInstaller(var permission: InstallPermissionState) :
         UpdateApkInstaller {
         override fun installPermissionState(): InstallPermissionState = permission
         override fun resolveInstaller(apk: File): InstallerResolution = InstallerResolution.PermissionRequired
@@ -88,13 +91,31 @@ class UpdateDialogHostTest {
             } else {
                 InstallLaunchResult.PermissionRequired
             }
-        override fun unknownAppSourcesSettingsIntent(): Intent = Intent()
+        override fun unknownAppSourcesSettingsIntent(): Intent =
+            Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse(
+                    "package:${ApplicationProvider.getApplicationContext<Application>().packageName}",
+                ),
+            )
     }
 
     private val manifestJson: String =
         """{"versionCode":9,"versionName":"1.1.6","downloadUrl":"https://github.com/nnou64396/tech-vision-dz-android/releases/download/v1.1.6/app-release.apk","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","releaseNotes":"Test release.","minimumVersionCode":8}"""
 
-    private fun viewModel(stagedApk: File): UpdateViewModel {
+    private class TestLifecycleOwner : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry(this)
+
+        fun simulateSettingsRoundTrip() {
+            lifecycle.currentState = Lifecycle.State.CREATED
+            lifecycle.currentState = Lifecycle.State.RESUMED
+        }
+    }
+
+    private fun viewModel(
+        stagedApk: File,
+        installer: FakeUpdateInstaller = FakeUpdateInstaller(InstallPermissionState.Denied),
+    ): UpdateViewModel {
         val application: Application = ApplicationProvider.getApplicationContext()
         return UpdateViewModel(
             repository = UpdateRepository(
@@ -105,7 +126,7 @@ class UpdateDialogHostTest {
             ),
             downloader = FakeUpdateDownloader(),
             verifier = FakeUpdateVerifier(),
-            installer = FakeUpdateInstaller(InstallPermissionState.Denied),
+            installer = installer,
             preferences = FakeUpdatePreferences(),
             application = application,
             stagedApkProvider = { stagedApk },
@@ -115,56 +136,23 @@ class UpdateDialogHostTest {
 
     // --- Regression tests --------------------------------------------------
 
-    /**
-     * The v1.1.5 startup crash. The launcher used to be registered
-     * unconditionally at the root of the host's composition; on the Infinix
-     * X6873 (Android 16) no `ActivityResultRegistryOwner` resolved at first
-     * frame and `rememberLauncherForActivityResult` threw the exact
-     * `IllegalStateException` seen in `adb logcat -b crash`. That condition is
-     * reproduced here by providing a non-activity [LocalContext] (so
-     * `LocalActivityResultRegistryOwner.current` resolves to null) while the
-     * host is in its initial Idle state — the startup path. This test fails on
-     * the pre-fix code and passes after the fix.
-     */
     @Test
-    fun idleHostComposesWithoutAnActivityResultRegistryOwner() {
+    fun permissionSettingsRoundTripWorksWithoutAnActivityResultRegistryOwner() {
         val staged = stagedApk()
-        val viewModel = viewModel(staged)
-        try {
-            // Application context is not an ActivityResultRegistryOwner, and the
-            // registry-owner composition local is unset here, so any launcher
-            // registration attempt throws — as it did on the device at startup.
-            val nonActivityContext: Context = ApplicationProvider.getApplicationContext()
-            composeRule.setContent {
-                CompositionLocalProvider(LocalContext provides nonActivityContext) {
-                    TechVisionDzTheme {
-                        UpdateDialogHost(updateViewModel = viewModel)
-                    }
-                }
-            }
-            composeRule.waitForIdle()
-
-            // Idle renders no dialog and, critically, no crash.
-            composeRule.onNodeWithText(strings.getString(R.string.update_now)).assertDoesNotExist()
-        } finally {
-            staged.delete()
+        val installer = FakeUpdateInstaller(InstallPermissionState.Denied)
+        val viewModel = viewModel(staged, installer)
+        val lifecycleOwner = TestLifecycleOwner()
+        composeRule.runOnUiThread {
+            lifecycleOwner.lifecycle.currentState = Lifecycle.State.RESUMED
         }
-    }
-
-    /**
-     * The permission detour is the one place the settings launcher is required.
-     * With a real `ComponentActivity` host (owner present) and the state driven
-     * to [UpdateUiState.InstallationPermissionRequired], the Open settings
-     * button must still be rendered — proving the conditional registration is
-     * alive exactly when needed and dead at every other time.
-     */
-    @Test
-    fun permissionRequiredDrivesTheConditionalLauncherAndShowsOpenSettings() {
-        val staged = stagedApk()
-        val viewModel = viewModel(staged)
+        val launchedIntents = mutableListOf<Intent>()
+        val applicationContext: Context = ApplicationProvider.getApplicationContext()
+        val contextWithoutActivityResultOwner = object : ContextWrapper(applicationContext) {
+            override fun startActivity(intent: Intent) {
+                launchedIntents += intent
+            }
+        }
         try {
-            // Drive the full flow on the main thread; fakes don't suspend, so the
-            // immediate dispatcher completes the whole chain in-line.
             composeRule.runOnUiThread {
                 viewModel.checkForUpdate(manual = true)
                 viewModel.updateNow()
@@ -175,8 +163,13 @@ class UpdateDialogHostTest {
             assertEquals(UpdateUiState.InstallationPermissionRequired, viewModel.uiState.value)
 
             composeRule.setContent {
-                TechVisionDzTheme {
-                    UpdateDialogHost(updateViewModel = viewModel)
+                CompositionLocalProvider(
+                    LocalContext provides contextWithoutActivityResultOwner,
+                    LocalLifecycleOwner provides lifecycleOwner,
+                ) {
+                    TechVisionDzTheme {
+                        UpdateDialogHost(updateViewModel = viewModel)
+                    }
                 }
             }
             composeRule.waitForIdle()
@@ -185,13 +178,30 @@ class UpdateDialogHostTest {
                 .assertIsDisplayed()
             composeRule.onNodeWithText(strings.getString(R.string.update_install))
                 .assertIsDisplayed()
-        } catch (t: Throwable) {
-            // Diagnostics: dump the tree instead of failing blind on a layout mismatch.
-            android.util.Log.e("UpdateDialogHostTest", "assert failed", t)
-            android.util.Log.e(
-                "UpdateDialogHostTest",
-                composeRule.onRoot(useUnmergedTree = true).printToString(),
+
+            composeRule.onNodeWithText(strings.getString(R.string.update_open_settings))
+                .performClick()
+            composeRule.waitForIdle()
+
+            assertEquals(1, launchedIntents.size)
+            assertEquals(
+                "android.settings.MANAGE_UNKNOWN_APP_SOURCES",
+                launchedIntents.single().action,
             )
+            assertEquals(
+                "package:${strings.packageName}",
+                launchedIntents.single().dataString,
+            )
+
+            installer.permission = InstallPermissionState.Allowed
+            composeRule.runOnUiThread { lifecycleOwner.simulateSettingsRoundTrip() }
+            composeRule.waitForIdle()
+
+            assertEquals(UpdateUiState.ReadyToInstall, viewModel.uiState.value)
+            composeRule.onNodeWithText(strings.getString(R.string.update_ready_to_install))
+                .assertIsDisplayed()
+        } catch (t: Throwable) {
+            android.util.Log.e("UpdateDialogHostTest", "assert failed", t)
             throw t
         } finally {
             staged.delete()
