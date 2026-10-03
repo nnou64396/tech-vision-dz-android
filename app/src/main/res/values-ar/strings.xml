@@ -114,6 +114,9 @@
     <string name="settings_about">حول التطبيق</string>
     <string name="settings_website">زيارة موقعنا</string>
     <string name="settings_website_error">تعذر فتح الموقع. تحقق من المتصفح وحاول مرة أخرى</string>
+    <string name="settings_sponsored_link">رابط إعلاني</string>
+    <string name="settings_sponsored_link_description">فتح رابط ترويجي خارجي</string>
+    <string name="settings_sponsored_link_error">تعذر فتح الرابط الترويجي. تحقق من المتصفح وحاول مرة أخرى</string>
     <string name="account_guest">قارئ TECH VISION DZ</string>
     <string name="account_member_since">عضو منذ %1$s</string>
     <string name="account_sign_out">تسجيل الخروج</string>

@@ -51,6 +51,9 @@ import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
 import kotlinx.coroutines.launch
 
+private const val SPONSORED_LINK_URL =
+    "https://asiafilm.org/4/63a5c5ab5ac74ba25b412fc9d69758eb"
+
 /**
  * Settings screen - the app's app-experience control center.
  *
@@ -62,9 +65,9 @@ import kotlinx.coroutines.launch
  *  - Updates: reuses the shared [UpdateStatusCard] (check row + installed
  *    version); the root update dialog continues to drive everything from
  *    "update available" onward.
- *  - About: brand identity, installed version and a link to the configured
- *    website. The link only leaves the app when it passes the existing
- *    http(s)-only URL gate; failures surface a snackbar instead of crashing.
+ *  - About: brand identity, installed version, the configured website link
+ *    and an optional external sponsored link. Links only leave the app after
+ *    a user tap and pass the existing http(s)-only URL gate.
  */
 @Composable
 fun SettingsScreen(
@@ -78,6 +81,7 @@ fun SettingsScreen(
     val updateState by updateViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val websiteFailureMessage = stringResource(R.string.settings_website_error)
+    val sponsoredLinkFailureMessage = stringResource(R.string.settings_sponsored_link_error)
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     // The link is only ever offered when it survives the http(s)-only gate,
@@ -90,6 +94,20 @@ fun SettingsScreen(
             runCatching { uriHandler.openUri(safeWebsiteUrl) }
                 .onFailure {
                     scope.launch { snackbarHostState.showSnackbar(websiteFailureMessage) }
+                }
+        }
+        Unit
+    }
+    val safeSponsoredLinkUrl = remember {
+        DownloadUrlPolicy.normalize(SPONSORED_LINK_URL)
+    }
+    val openSponsoredLink = {
+        if (safeSponsoredLinkUrl == null) {
+            scope.launch { snackbarHostState.showSnackbar(sponsoredLinkFailureMessage) }
+        } else {
+            runCatching { uriHandler.openUri(safeSponsoredLinkUrl) }
+                .onFailure {
+                    scope.launch { snackbarHostState.showSnackbar(sponsoredLinkFailureMessage) }
                 }
         }
         Unit
@@ -151,6 +169,8 @@ fun SettingsScreen(
                     versionName = BuildConfig.VERSION_NAME,
                     websiteUrl = safeWebsiteUrl,
                     onVisitWebsite = openWebsite,
+                    sponsoredLinkUrl = safeSponsoredLinkUrl,
+                    onOpenSponsoredLink = openSponsoredLink,
                 )
             }
         }
@@ -289,6 +309,8 @@ private fun AboutCard(
     versionName: String,
     websiteUrl: String?,
     onVisitWebsite: () -> Unit,
+    sponsoredLinkUrl: String?,
+    onOpenSponsoredLink: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -349,6 +371,44 @@ private fun AboutCard(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                }
+            }
+            if (sponsoredLinkUrl != null) {
+                Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
+                Surface(
+                    onClick = onOpenSponsoredLink,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_about_sponsored_link"),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = TechVisionSpacing.Md,
+                            vertical = TechVisionSpacing.Md,
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.settings_sponsored_link),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_sponsored_link_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

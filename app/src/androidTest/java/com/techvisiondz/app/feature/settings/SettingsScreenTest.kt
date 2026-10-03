@@ -3,6 +3,7 @@ package com.techvisiondz.app.feature.settings
 import android.app.Application
 import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -10,6 +11,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import com.techvisiondz.app.BuildConfig
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.settings.AppLanguage
@@ -196,6 +199,45 @@ class SettingsScreenTest {
             context.getString(R.string.update_version, BuildConfig.VERSION_NAME),
         ).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.settings_website)).assertIsDisplayed()
+    }
+
+    @Test
+    fun sponsoredLinkIsClearlyExternalAndOpensOnlyAfterTap() {
+        val openedUrls = mutableListOf<String>()
+        val uriHandler = object : UriHandler {
+            override fun openUri(uri: String) {
+                openedUrls += uri
+            }
+        }
+        prefs = FakeSettingsPreferences(language = AppLanguage.ENGLISH)
+        viewModel = SettingsViewModel(prefs) { AppLanguage.ENGLISH }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalUriHandler provides uriHandler) {
+                TechVisionDzTheme {
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        updateViewModel = idleUpdateViewModel(),
+                        onBack = {},
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("settings_about_sponsored_link").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.settings_sponsored_link)).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            context.getString(R.string.settings_sponsored_link_description),
+        ).assertIsDisplayed()
+        assertEquals(emptyList<String>(), openedUrls)
+
+        composeRule.onNodeWithTag("settings_about_sponsored_link").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(
+            listOf("https://asiafilm.org/4/63a5c5ab5ac74ba25b412fc9d69758eb"),
+            openedUrls,
+        )
     }
 
     @Test

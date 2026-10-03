@@ -109,6 +109,9 @@
     <string name="settings_about">About</string>
     <string name="settings_website">Visit our website</string>
     <string name="settings_website_error">Could not open the website. Check your browser and try again</string>
+    <string name="settings_sponsored_link">Sponsored link</string>
+    <string name="settings_sponsored_link_description">Open an external promotional link</string>
+    <string name="settings_sponsored_link_error">Could not open the promotional link. Check your browser and try again</string>
     <string name="account_guest">TECH VISION DZ reader</string>
     <string name="account_member_since">Member since %1$s</string>
     <string name="account_sign_out">Sign out</string>
