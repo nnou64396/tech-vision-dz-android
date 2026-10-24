@@ -6,10 +6,10 @@ The official Android application for **TECH VISION DZ**, an Algerian technology 
 
 | | |
 |---|---|
-| **Latest version** | v1.0.0 |
+| **Latest version** | v1.2.2 |
 | **Min Android** | Android 8.0 (API 26) |
 | **Package** | `com.techvisiondz.app` |
-| **APK** | [Download from GitHub Releases](https://github.com/nnou64396/tech-vision-dz-android/releases/download/v1.0.1/app-release.apk) |
+| **APK** | [Download from GitHub Releases](https://github.com/nnou64396/tech-vision-dz-android/releases/download/v1.2.2/app-release.apk) |
 
 ## Features
 
@@ -52,7 +52,7 @@ Visit the official website at **[techvisiondz.com](https://techvisiondz.com)**.
 
 ## Project Status
 
-**v1.0.0** is publicly available for testing and feedback.
+**v1.2.2** is publicly available for testing and feedback.
 
 ## Distribution
 
