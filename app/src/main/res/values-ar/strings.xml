@@ -173,4 +173,49 @@
     <string name="update_install_error">فشل تثبيت التحديث</string>
     <string name="update_dismiss">إغلاق</string>
     <string name="update_error_cancelled">تم إلغاء التحديث.</string>
+
+    <!-- Settings section extensions -->
+    <string name="settings_about_section">حول التطبيق</string>
+    <string name="settings_privacy_policy">سياسة الخصوصية</string>
+    <string name="settings_permissions_details">تفاصيل الأذونات</string>
+    <string name="settings_notifications">الإشعارات</string>
+
+    <!-- About Screen -->
+    <string name="about_title">حول TECH VISION DZ</string>
+    <string name="about_description">التطبيق الرسمي لنظام أندرويد لـ TECH VISION DZ، وهي منصة تكنولوجية جزائرية تغطي أحدث أخبار التكنولوجيا والذكاء الاصطناعي والهواتف الذكية والبرمجيات والاتجاهات الرقمية.</string>
+    <string name="about_website">الموقع الرسمي</string>
+    <string name="about_contact">اتصل بنا</string>
+    <string name="about_version">الإصدار %1$s</string>
+
+    <!-- Privacy Policy Screen -->
+    <string name="privacy_policy_title">سياسة الخصوصية</string>
+    <string name="privacy_policy_intro">تحترم TECH VISION DZ خصوصيتك وتلتزم بحماية بياناتك الشخصية. توضح سياسة الخصوصية هذه كيف يقوم تطبيق أندرويد الخاص بنا بجمع واستخدام وحماية معلوماتك.</string>
+    <string name="privacy_policy_collection_title">جمع البيانات واستخدامها</string>
+    <string name="privacy_policy_collection_body">التصفح العام (قراءة المقالات، البحث، وتصفح التصنيفات، المؤلفين، والوسوم) لا يتطلب حساباً ولا ينقل أي هوية شخصية. عند إنشاء حساب أو تسجيل الدخول، نقوم بمعالجة بيانات الاعتماد الخاصة بك عبر Supabase Auth. إذا قمت بحفظ المقالات، تتم مزامنة المراجع الخاصة بك بشكل آمن مع ملف تعريف حسابك في قاعدة بياناتنا.</string>
+    <string name="privacy_policy_storage_title">التخزين المحلي والتفضيلات</string>
+    <string name="privacy_policy_storage_body">يخزن التطبيق تفضيلاتك المحلية (مثل وضع المظهر واختيار اللغة) بشكل آمن على جهازك. لا يتم تخزين أي بيانات اعتماد خاصة أو أسرار حساسة دون تشفير.</string>
+    <string name="privacy_policy_network_title">الشبكة وخدمات الطرف الثالث</string>
+    <string name="privacy_policy_network_body">تستخدِم جميع اتصالات الشبكة بروتوكول HTTPS فقط. يتواصل التطبيق مباشرة مع خادم Supabase الآمن الخاص بنا ويحمّل صور المقالات عبر Coil. نحن لا نستخدم حزم تطوير برمجيات خاصة بتحليلات الطرف الثالث أو شبكات إعلانية أو خدمات تتبع.</string>
+    <string name="privacy_policy_security_title">الأمان وضوابط المستخدم</string>
+    <string name="privacy_policy_security_body">نحن نحافظ على معايير أمان صارمة لجميع عمليات نقل البيانات وتخزينها. تحتفظ بالسيطرة على بيانات حسابك والمقالات المحفوظة في جميع الأوقات.</string>
+    <string name="privacy_policy_contact_title">معلومات الاتصال</string>
+    <string name="privacy_policy_contact_body">لأي استفسارات تتعلق بالخصوصية أو أسئلة حول هذه السياسة، يرجى زيارة موقعنا الرسمي على https://techvisiondz.com.</string>
+
+    <!-- Permissions Details Screen -->
+    <string name="permissions_title">تفاصيل الأذونات</string>
+    <string name="permissions_intro">يطلب التطبيق فقط الأذونات اللازمة لتقديم ميزاته الأساسية بأمان وموثوقية.</string>
+    <string name="permission_internet_name">الوصول إلى الإنترنت</string>
+    <string name="permission_internet_purpose">مطلوب للاتصال بخادم TECH VISION DZ، وجلب مقالات الأخبار التقنية، وتحميل الوسائط عبر الشبكة.</string>
+    <string name="permission_install_packages_name">تتبيت الحزم</string>
+    <string name="permission_install_packages_purpose">مطلوب لميزة التحديث المضمنة لتثبيت تحديثات التطبيق التي تم التحقق منها مباشرة على إصدارات أندرويد المدعومة.</string>
+    <string name="permissions_open_settings">فتح إعدادات تطبيق النظام</string>
+    <string name="permissions_settings_unavailable">تعذر فتح إعدادات تطبيق النظام.</string>
+
+    <!-- Notifications Settings Screen -->
+    <string name="notifications_title">الإشعارات</string>
+    <string name="notifications_intro">إدارة تفضيلات الإشعارات وإعدادات النظام.</string>
+    <string name="notifications_status_title">إشعارات التحديثات</string>
+    <string name="notifications_status_description">يتحقق التطبيق من التحديثات المتاحة تلقائياً أو عند الطلب. لا يتم استخدام إشعارات الدفع (Push Notifications) في هذا الإصدار.</string>
+    <string name="notifications_open_system_settings">فتح إعدادات إشعارات النظام</string>
+    <string name="notifications_settings_unavailable">تعذر فتح إعدادات إشعارات النظام.</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.techvisiondz.app.core.navigation
 
+import android.annotation.SuppressLint
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -57,6 +58,7 @@ class AppNavHostTest {
     }
 
     @Test
+    @SuppressLint("ViewModelConstructorInComposable")
     fun homeSettingsIconNavigatesToSettingsAndBackReturnsHome() {
         composeRule.setContent {
             TechVisionDzTheme {

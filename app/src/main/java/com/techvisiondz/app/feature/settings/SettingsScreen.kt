@@ -57,23 +57,24 @@ private const val SPONSORED_LINK_URL =
 /**
  * Settings screen - the app's app-experience control center.
  *
- * Four sections, all presentational and downstream-owned:
- *  - Appearance: System / Light / Dark theme selection. System stays the
- *    default; the choice is persisted and applied immediately by the app root.
- *  - Language: Arabic / English. The choice is persisted and applied
- *    immediately (RTL / LTR) without recreating the navigation stack.
- *  - Updates: reuses the shared [UpdateStatusCard] (check row + installed
- *    version); the root update dialog continues to drive everything from
- *    "update available" onward.
- *  - About: brand identity, installed version, the configured website link
- *    and an optional external sponsored link. Links only leave the app after
- *    a user tap and pass the existing http(s)-only URL gate.
+ * Contains primary sections:
+ *  - About
+ *  - Privacy Policy
+ *  - Permissions Details
+ *  - Notifications
+ *  - Appearance: System / Light / Dark theme selection.
+ *  - Language: Arabic / English.
+ *  - Updates: reuses the shared [UpdateStatusCard].
  */
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     updateViewModel: UpdateViewModel,
     onBack: () -> Unit,
+    onAboutClick: () -> Unit,
+    onPrivacyPolicyClick: () -> Unit,
+    onPermissionsClick: () -> Unit,
+    onNotificationsClick: () -> Unit,
     websiteUrl: String? = AppConfig.ARTICLE_BASE_URL,
     onOpenWebsite: (() -> Unit)? = null,
 ) {
@@ -84,8 +85,6 @@ fun SettingsScreen(
     val sponsoredLinkFailureMessage = stringResource(R.string.settings_sponsored_link_error)
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
-    // The link is only ever offered when it survives the http(s)-only gate,
-    // regardless of what produced the [websiteUrl] value.
     val safeWebsiteUrl = remember(websiteUrl) { DownloadUrlPolicy.normalize(websiteUrl) }
     val openWebsite = onOpenWebsite ?: {
         if (safeWebsiteUrl == null) {
@@ -126,6 +125,51 @@ fun SettingsScreen(
                 .padding(horizontal = TechVisionSpacing.Lg)
                 .padding(top = TechVisionSpacing.Xl, bottom = TechVisionSpacing.Xl),
         ) {
+            // Core 4 Sections requested
+            SettingsSection(title = stringResource(R.string.settings_about_section)) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.about_title),
+                    subtitle = stringResource(R.string.update_version, BuildConfig.VERSION_NAME),
+                    testTag = "settings_nav_about",
+                    onClick = onAboutClick,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
+            SettingsSection(title = stringResource(R.string.settings_privacy_policy)) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.privacy_policy_title),
+                    subtitle = stringResource(R.string.privacy_policy_intro),
+                    testTag = "settings_nav_privacy_policy",
+                    onClick = onPrivacyPolicyClick,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
+            SettingsSection(title = stringResource(R.string.settings_permissions_details)) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.permissions_title),
+                    subtitle = stringResource(R.string.permissions_intro),
+                    testTag = "settings_nav_permissions",
+                    onClick = onPermissionsClick,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
+            SettingsSection(title = stringResource(R.string.settings_notifications)) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.notifications_title),
+                    subtitle = stringResource(R.string.notifications_intro),
+                    testTag = "settings_nav_notifications",
+                    onClick = onNotificationsClick,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
             SettingsSection(title = stringResource(R.string.settings_appearance)) {
                 ThemeSelector(
                     current = state.themeMode,
@@ -161,18 +205,6 @@ fun SettingsScreen(
                     testTag = "settings_update_row",
                 )
             }
-
-            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
-
-            SettingsSection(title = stringResource(R.string.settings_about)) {
-                AboutCard(
-                    versionName = BuildConfig.VERSION_NAME,
-                    websiteUrl = safeWebsiteUrl,
-                    onVisitWebsite = openWebsite,
-                    sponsoredLinkUrl = safeSponsoredLinkUrl,
-                    onOpenSponsoredLink = openSponsoredLink,
-                )
-            }
         }
     }
 }
@@ -187,6 +219,55 @@ private fun SettingsSection(
         SectionHeader(title = title)
         Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
         content()
+    }
+}
+
+@Composable
+private fun SettingsNavigationItem(
+    title: String,
+    subtitle: String? = null,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = TechVisionSpacing.Lg,
+                vertical = TechVisionSpacing.Md,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(TechVisionSpacing.Xs))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                    )
+                }
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -300,119 +381,5 @@ private fun SelectionRow(option: SelectionOption) {
             selected = option.selected,
             onClick = option.onClick,
         )
-    }
-}
-
-/** Brand identity, installed version and a validated website link. */
-@Composable
-private fun AboutCard(
-    versionName: String,
-    websiteUrl: String?,
-    onVisitWebsite: () -> Unit,
-    sponsoredLinkUrl: String?,
-    onOpenSponsoredLink: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("settings_about_card"),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(modifier = Modifier.padding(TechVisionSpacing.Lg)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BrandMark(size = 44.dp)
-                Spacer(modifier = Modifier.width(TechVisionSpacing.Md))
-                Column {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = stringResource(R.string.home_tagline),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
-            Text(
-                text = stringResource(R.string.update_version, versionName),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (websiteUrl != null) {
-                Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
-                Surface(
-                    onClick = onVisitWebsite,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("settings_about_website"),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = TechVisionSpacing.Md,
-                            vertical = TechVisionSpacing.Md,
-                        ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.settings_website),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    }
-                }
-            }
-            if (sponsoredLinkUrl != null) {
-                Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
-                Surface(
-                    onClick = onOpenSponsoredLink,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("settings_about_sponsored_link"),
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = TechVisionSpacing.Md,
-                            vertical = TechVisionSpacing.Md,
-                        ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.settings_sponsored_link),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = stringResource(R.string.settings_sponsored_link_description),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
     }
 }

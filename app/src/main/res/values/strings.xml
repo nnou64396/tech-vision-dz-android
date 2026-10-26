@@ -168,4 +168,49 @@
     <string name="update_install_error">Update install failed</string>
     <string name="update_dismiss">Dismiss</string>
     <string name="update_error_cancelled">Update cancelled.</string>
+
+    <!-- Settings section extensions -->
+    <string name="settings_about_section">About</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
+    <string name="settings_permissions_details">Permissions Details</string>
+    <string name="settings_notifications">Notifications</string>
+
+    <!-- About Screen -->
+    <string name="about_title">About TECH VISION DZ</string>
+    <string name="about_description">The official Android application for TECH VISION DZ, an Algerian technology platform covering the latest in tech news, AI, smartphones, software, and digital trends.</string>
+    <string name="about_website">Official Website</string>
+    <string name="about_contact">Contact Us</string>
+    <string name="about_version">Version %1$s</string>
+
+    <!-- Privacy Policy Screen -->
+    <string name="privacy_policy_title">Privacy Policy</string>
+    <string name="privacy_policy_intro">TECH VISION DZ respects your privacy and is committed to protecting your personal data. This privacy policy explains how our Android application collects, uses, and safeguards your information.</string>
+    <string name="privacy_policy_collection_title">Data Collection and Usage</string>
+    <string name="privacy_policy_collection_body">Public browsing (reading articles, searching, and viewing categories, authors, and tags) does not require an account and transmits no personal identity. When you create an account or sign in, we process your credentials via Supabase Auth. If you bookmark or save articles, your saved article references are securely synced with your account profile in our database.</string>
+    <string name="privacy_policy_storage_title">Local Storage and Preferences</string>
+    <string name="privacy_policy_storage_body">The application stores your local preferences (such as theme mode and language choice) securely on your device. No private credentials or sensitive secrets are stored unencrypted.</string>
+    <string name="privacy_policy_network_title">Network and Third-Party Services</string>
+    <string name="privacy_policy_network_body">All network communications use HTTPS only. The app communicates directly with our secure Supabase backend and loads article images via Coil. We do not use third-party analytics SDKs, advertising networks, or tracking services.</string>
+    <string name="privacy_policy_security_title">Security and User Controls</string>
+    <string name="privacy_policy_security_body">We maintain rigorous security standards for all data transmission and storage. You retain control over your account data and saved articles at all times.</string>
+    <string name="privacy_policy_contact_title">Contact Information</string>
+    <string name="privacy_policy_contact_body">For any privacy-related inquiries or questions regarding this policy, please visit our official website at https://techvisiondz.com.</string>
+
+    <!-- Permissions Details Screen -->
+    <string name="permissions_title">Permissions Details</string>
+    <string name="permissions_intro">The application requests only the permissions necessary to deliver its core features safely and reliably.</string>
+    <string name="permission_internet_name">Internet Access</string>
+    <string name="permission_internet_purpose">Required to connect to the TECH VISION DZ backend, fetch tech news articles, and load media over the network.</string>
+    <string name="permission_install_packages_name">Install Packages</string>
+    <string name="permission_install_packages_purpose">Required for the built-in in-app updater to install verified application updates directly on supported Android versions.</string>
+    <string name="permissions_open_settings">Open System App Settings</string>
+    <string name="permissions_settings_unavailable">Could not open system application settings.</string>
+
+    <!-- Notifications Settings Screen -->
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_intro">Manage notification preferences and system settings.</string>
+    <string name="notifications_status_title">Update Notifications</string>
+    <string name="notifications_status_description">The app checks for available updates automatically or on demand. Push notifications are not utilized by this version.</string>
+    <string name="notifications_open_system_settings">Open System Notification Settings</string>
+    <string name="notifications_settings_unavailable">Could not open system notification settings.</string>
 </resources>

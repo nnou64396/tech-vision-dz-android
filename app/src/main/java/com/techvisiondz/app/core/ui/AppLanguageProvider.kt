@@ -1,5 +1,6 @@
 package com.techvisiondz.app.core.ui
 
+import android.annotation.SuppressLint
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,6 +25,7 @@ import java.util.Locale
  * Both locals are pure composition data: no activity finish/start, no saved
  * state loss, and existing ViewModels / navigation survive the switch.
  */
+@SuppressLint("LocalContextConfigurationRead")
 @Composable
 fun ProvideAppLanguage(
     language: AppLanguage,

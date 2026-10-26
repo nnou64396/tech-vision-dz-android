@@ -1,5 +1,6 @@
 package com.techvisiondz.app.core.navigation
 
+import android.annotation.SuppressLint
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -116,6 +117,7 @@ class AccountNavigationTest {
     }
 
     @Test
+    @SuppressLint("ViewModelConstructorInComposable")
     fun settingsRowOnAccountOpensSettingsScreen() {
         composeRule.setContent {
             TechVisionDzTheme {

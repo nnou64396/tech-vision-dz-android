@@ -50,6 +50,10 @@ import com.techvisiondz.app.feature.saved.SavedArticlesScreen
 import com.techvisiondz.app.feature.saved.SavedArticlesViewModel
 import com.techvisiondz.app.feature.search.SearchScreen
 import com.techvisiondz.app.feature.search.SearchViewModel
+import com.techvisiondz.app.feature.settings.AboutScreen
+import com.techvisiondz.app.feature.settings.NotificationsSettingsScreen
+import com.techvisiondz.app.feature.settings.PermissionsDetailsScreen
+import com.techvisiondz.app.feature.settings.PrivacyPolicyScreen
 import com.techvisiondz.app.feature.settings.SettingsScreen
 import com.techvisiondz.app.feature.settings.SettingsViewModel
 import com.techvisiondz.app.feature.tag.TagArticlesScreen
@@ -201,8 +205,32 @@ fun AppNavHost(
         composable<Routes.Settings> {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                onAboutClick = { navController.navigate(Routes.About) },
+                onPrivacyPolicyClick = { navController.navigate(Routes.PrivacyPolicy) },
+                onPermissionsClick = { navController.navigate(Routes.PermissionsDetails) },
+                onNotificationsClick = { navController.navigate(Routes.Notifications) },
                 viewModel = effectiveSettingsViewModel,
                 updateViewModel = effectiveUpdateViewModel,
+            )
+        }
+        composable<Routes.About> {
+            AboutScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<Routes.PrivacyPolicy> {
+            PrivacyPolicyScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<Routes.PermissionsDetails> {
+            PermissionsDetailsScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<Routes.Notifications> {
+            NotificationsSettingsScreen(
+                onBack = { navController.popBackStack() },
             )
         }
         composable<Routes.SavedArticles> {

@@ -53,4 +53,16 @@ object Routes {
 
     @Serializable
     data object Settings
+
+    @Serializable
+    data object About
+
+    @Serializable
+    data object PrivacyPolicy
+
+    @Serializable
+    data object PermissionsDetails
+
+    @Serializable
+    data object Notifications
 }
