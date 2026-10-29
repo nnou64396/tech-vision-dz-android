@@ -2,18 +2,14 @@ package com.techvisiondz.app
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.navigation.AppNavHost
 import com.techvisiondz.app.core.navigation.DeepLinkTarget
 import com.techvisiondz.app.core.ui.ProvideAppLanguage
 import com.techvisiondz.app.core.settings.ThemeMode
 import com.techvisiondz.app.feature.settings.SettingsViewModel
-import com.techvisiondz.app.feature.update.UpdateDialogHost
-import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
 
 /**
@@ -49,21 +45,10 @@ fun TechVisionDzApp(
                 ThemeMode.DARK -> true
             },
         ) {
-            val updateViewModel: UpdateViewModel = viewModel(factory = UpdateViewModel.Factory)
-
-            LaunchedEffect(Unit) {
-                if (AppConfig.UPDATER_ENABLED) {
-                    updateViewModel.checkForUpdate()
-                }
-            }
-
             AppNavHost(
-                updateViewModel = updateViewModel,
                 settingsViewModel = effectiveSettingsViewModel,
                 deepLinkTarget = deepLinkTarget,
             )
-
-            UpdateDialogHost(updateViewModel = updateViewModel)
         }
     }
 }

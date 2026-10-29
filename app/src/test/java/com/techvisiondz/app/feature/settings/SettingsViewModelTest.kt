@@ -4,7 +4,9 @@ import com.techvisiondz.app.core.settings.AppLanguage
 import com.techvisiondz.app.core.settings.SettingsPreferences
 import com.techvisiondz.app.core.settings.ThemeMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -17,6 +19,11 @@ class SettingsViewModelTest {
     private class FakeSettingsPreferences(
         private var theme: ThemeMode? = null,
         private var language: AppLanguage? = null,
+        private var notificationsEnabled: Boolean = true,
+        private var newsEnabled: Boolean = true,
+        private var announcementsEnabled: Boolean = true,
+        private var alertsEnabled: Boolean = true,
+        private var token: String? = null,
     ) : SettingsPreferences {
         override fun themeMode(): ThemeMode = theme ?: ThemeMode.SYSTEM
         override fun setThemeMode(mode: ThemeMode) {
@@ -27,6 +34,31 @@ class SettingsViewModelTest {
         override fun setLanguage(language: AppLanguage) {
             this.language = language
         }
+
+        override fun isNotificationsEnabled(): Boolean = notificationsEnabled
+        override fun setNotificationsEnabled(enabled: Boolean) {
+            notificationsEnabled = enabled
+        }
+
+        override fun isNewsNotificationsEnabled(): Boolean = newsEnabled
+        override fun setNewsNotificationsEnabled(enabled: Boolean) {
+            newsEnabled = enabled
+        }
+
+        override fun isAnnouncementsNotificationsEnabled(): Boolean = announcementsEnabled
+        override fun setAnnouncementsNotificationsEnabled(enabled: Boolean) {
+            announcementsEnabled = enabled
+        }
+
+        override fun isAlertsNotificationsEnabled(): Boolean = alertsEnabled
+        override fun setAlertsNotificationsEnabled(enabled: Boolean) {
+            alertsEnabled = enabled
+        }
+
+        override fun fcmToken(): String? = token
+        override fun setFcmToken(token: String?) {
+            this.token = token
+        }
     }
 
     @Test
@@ -35,6 +67,7 @@ class SettingsViewModelTest {
 
         assertEquals(ThemeMode.SYSTEM, viewModel.uiState.value.themeMode)
         assertEquals(AppLanguage.ENGLISH, viewModel.uiState.value.language)
+        assertTrue(viewModel.uiState.value.notificationsEnabled)
     }
 
     @Test
@@ -73,6 +106,31 @@ class SettingsViewModelTest {
         viewModel.setLanguage(AppLanguage.ARABIC)
 
         assertEquals(AppLanguage.ARABIC, viewModel.uiState.value.language)
+    }
+
+    @Test
+    fun togglingNotificationCategoriesAppliesImmediately() {
+        val preferences = FakeSettingsPreferences()
+        val viewModel = SettingsViewModel(preferences) { AppLanguage.ENGLISH }
+
+        viewModel.setNewsNotificationsEnabled(false)
+        assertFalse(viewModel.uiState.value.newsNotificationsEnabled)
+
+        viewModel.setAnnouncementsNotificationsEnabled(false)
+        assertFalse(viewModel.uiState.value.announcementsNotificationsEnabled)
+
+        viewModel.setAlertsNotificationsEnabled(false)
+        assertFalse(viewModel.uiState.value.alertsNotificationsEnabled)
+    }
+
+    @Test
+    fun fcmTokenUpdatesAndSurvivesViewModelRecreation() {
+        val preferences = FakeSettingsPreferences()
+        val first = SettingsViewModel(preferences) { AppLanguage.ENGLISH }
+        first.setFcmToken("test_fcm_token_12345")
+
+        val restarted = SettingsViewModel(preferences) { AppLanguage.ENGLISH }
+        assertEquals("test_fcm_token_12345", restarted.uiState.value.fcmToken)
     }
 
     @Test

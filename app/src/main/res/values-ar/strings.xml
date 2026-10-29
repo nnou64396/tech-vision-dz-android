@@ -114,9 +114,6 @@
     <string name="settings_about">حول التطبيق</string>
     <string name="settings_website">زيارة موقعنا</string>
     <string name="settings_website_error">تعذر فتح الموقع. تحقق من المتصفح وحاول مرة أخرى</string>
-    <string name="settings_sponsored_link">رابط إعلاني</string>
-    <string name="settings_sponsored_link_description">فتح رابط ترويجي خارجي</string>
-    <string name="settings_sponsored_link_error">تعذر فتح الرابط الترويجي. تحقق من المتصفح وحاول مرة أخرى</string>
     <string name="account_guest">قارئ TECH VISION DZ</string>
     <string name="account_member_since">عضو منذ %1$s</string>
     <string name="account_sign_out">تسجيل الخروج</string>
@@ -211,11 +208,43 @@
     <string name="permissions_open_settings">فتح إعدادات تطبيق النظام</string>
     <string name="permissions_settings_unavailable">تعذر فتح إعدادات تطبيق النظام.</string>
 
+    <!-- Developer Branding -->
+    <string name="developer_attribution">Developed by Tech Vision DZ</string>
+
     <!-- Notifications Settings Screen -->
     <string name="notifications_title">الإشعارات</string>
-    <string name="notifications_intro">إدارة تفضيلات الإشعارات وإعدادات النظام.</string>
-    <string name="notifications_status_title">إشعارات التحديثات</string>
-    <string name="notifications_status_description">يتحقق التطبيق من التحديثات المتاحة تلقائياً أو عند الطلب. لا يتم استخدام إشعارات الدفع (Push Notifications) في هذا الإصدار.</string>
+    <string name="notifications_intro">إدارة قنوات الإشعارات، أذونات النظام، وتفضيلات الفئات.</string>
+    <string name="notifications_status_title">حالة إشعارات الدفع</string>
+    <string name="notifications_status_description">احصل على تنبيهات فورية لأخبار التكنولوجيا والذكاء الاصطناعي والإعلانات الرسمية.</string>
     <string name="notifications_open_system_settings">فتح إعدادات إشعارات النظام</string>
     <string name="notifications_settings_unavailable">تعذر فتح إعدادات إشعارات النظام.</string>
+    <string name="notifications_master_toggle">تفعيل إشعارات الدفع</string>
+    <string name="notifications_master_toggle_desc">تلقي التحديثات والأخبار والإعلانات الفورية</string>
+    <string name="notifications_categories_header">قنوات الإشعارات</string>
+    <string name="notif_channel_news_name">أخبار المقالات والتكنولوجيا</string>
+    <string name="notif_channel_news_desc">إشعارات للمقالات التقنية والدروس الجديدة</string>
+    <string name="notif_channel_announcements_name">إعلانات وتحديثات التطبيق</string>
+    <string name="notif_channel_announcements_desc">إشعارات هامة حول المنصة والميزات الجديدة</string>
+    <string name="notif_channel_alerts_name">تنبهات الأخبار العاجلة</string>
+    <string name="notif_channel_alerts_desc">تنبهات عاجلة لأهم الأخبار التكنولوجية والنشرات الأمنية</string>
+    <string name="notifications_permission_title">إذن الإشعارات</string>
+    <string name="notifications_permission_granted">الإذن ممنوح</string>
+    <string name="notifications_permission_denied">الإذن غير ممنوح</string>
+    <string name="notifications_permission_rationale">ابقَ على اطلاع بأحدث الأخبار التقنية الجزائرية والعالمية والتنبيهات العاجلة وتحديثات التطبيق.</string>
+    <string name="notifications_request_permission_button">السماح بالإشعارات</string>
+    <string name="notifications_fcm_token_title">حالة رمز FCM</string>
+    <string name="notifications_fcm_token_registered">الجهاز مسجل لإشعارات الدفع FCM</string>
+    <string name="notifications_fcm_token_pending">رمز FCM قيد التهيئة أو غير متصل</string>
+
+    <!-- Sources Section -->
+    <string name="sources">المصادر</string>
+    <string name="sources_title">مصادر المحتوى</string>
+    <string name="sources_subtitle">استكشف وسائل الإعلام التقنية الموثوقة وبوابات المطورين والخلاصات الرسمية التي تدعمها TECH VISION DZ.</string>
+    <string name="sources_refresh_failed">تعذّر تحديث المصادر. يتم عرض آخر دليل متاح.</string>
+    <string name="sources_search_placeholder">البحث عن مصادر بالاسم أو التصنيف أو الوصف…</string>
+    <string name="sources_filter_all">جميع التصنيفات</string>
+    <string name="sources_visit_website">زيارة الموقع</string>
+    <string name="sources_empty">لم يتم العثور على مصادر تطابق بحثك.</string>
+    <string name="sources_official_badge">الموجز الرسمي</string>
+    <string name="sources_count">%1$d مصدر محتوى</string>
 </resources>

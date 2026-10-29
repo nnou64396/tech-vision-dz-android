@@ -65,4 +65,7 @@ object Routes {
 
     @Serializable
     data object Notifications
+
+    @Serializable
+    data object Sources
 }

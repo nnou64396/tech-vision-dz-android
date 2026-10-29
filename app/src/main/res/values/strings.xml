@@ -109,9 +109,6 @@
     <string name="settings_about">About</string>
     <string name="settings_website">Visit our website</string>
     <string name="settings_website_error">Could not open the website. Check your browser and try again</string>
-    <string name="settings_sponsored_link">Sponsored link</string>
-    <string name="settings_sponsored_link_description">Open an external promotional link</string>
-    <string name="settings_sponsored_link_error">Could not open the promotional link. Check your browser and try again</string>
     <string name="account_guest">TECH VISION DZ reader</string>
     <string name="account_member_since">Member since %1$s</string>
     <string name="account_sign_out">Sign out</string>
@@ -207,10 +204,43 @@
     <string name="permissions_settings_unavailable">Could not open system application settings.</string>
 
     <!-- Notifications Settings Screen -->
+    <!-- Developer Branding -->
+    <string name="developer_attribution">Developed by Tech Vision DZ</string>
+
+    <!-- Notifications Settings Screen -->
     <string name="notifications_title">Notifications</string>
-    <string name="notifications_intro">Manage notification preferences and system settings.</string>
-    <string name="notifications_status_title">Update Notifications</string>
-    <string name="notifications_status_description">The app checks for available updates automatically or on demand. Push notifications are not utilized by this version.</string>
+    <string name="notifications_intro">Manage push notification channels, system permissions, and category preferences.</string>
+    <string name="notifications_status_title">Push Notification Status</string>
+    <string name="notifications_status_description">Receive real-time alerts for new tech news, AI developments, and official platform announcements.</string>
     <string name="notifications_open_system_settings">Open System Notification Settings</string>
     <string name="notifications_settings_unavailable">Could not open system notification settings.</string>
+    <string name="notifications_master_toggle">Enable Push Notifications</string>
+    <string name="notifications_master_toggle_desc">Receive instant updates, news, and announcements</string>
+    <string name="notifications_categories_header">Notification Channels</string>
+    <string name="notif_channel_news_name">Tech News &amp; Articles</string>
+    <string name="notif_channel_news_desc">Notifications for newly published tech articles and tutorials</string>
+    <string name="notif_channel_announcements_name">App Announcements &amp; Updates</string>
+    <string name="notif_channel_announcements_desc">Important platform notices and feature updates</string>
+    <string name="notif_channel_alerts_name">Breaking Tech Alerts</string>
+    <string name="notif_channel_alerts_desc">Urgent alerts for major tech news and security advisories</string>
+    <string name="notifications_permission_title">Notification Permission</string>
+    <string name="notifications_permission_granted">Permission Granted</string>
+    <string name="notifications_permission_denied">Permission Not Granted</string>
+    <string name="notifications_permission_rationale">Stay up to date with the latest Algerian and global tech news, breaking alerts, and application updates. Request notification permission to enable FCM alerts.</string>
+    <string name="notifications_request_permission_button">Allow Notifications</string>
+    <string name="notifications_fcm_token_title">FCM Token Status</string>
+    <string name="notifications_fcm_token_registered">Device registered for FCM push notifications</string>
+    <string name="notifications_fcm_token_pending">FCM Token initializing or offline</string>
+
+    <!-- Sources Section -->
+    <string name="sources">Sources</string>
+    <string name="sources_title">Content Sources</string>
+    <string name="sources_subtitle">Discover verified news outlets, developer portals, and official tech feeds supported by Tech Vision DZ.</string>
+    <string name="sources_refresh_failed">Could not refresh sources. Showing the last available directory.</string>
+    <string name="sources_search_placeholder">Search sources by name, category or description…</string>
+    <string name="sources_filter_all">All Categories</string>
+    <string name="sources_visit_website">Visit Website</string>
+    <string name="sources_empty">No sources found matching your query.</string>
+    <string name="sources_official_badge">Official Feed</string>
+    <string name="sources_count">%1$d Content Sources</string>
 </resources>

@@ -16,8 +16,8 @@ import androidx.navigation.toRoute
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.AuthState
-import com.techvisiondz.app.core.data.repository.AuthRepository
 import com.techvisiondz.app.core.data.repository.ArticleRepository
+import com.techvisiondz.app.core.data.repository.AuthRepository
 import com.techvisiondz.app.core.data.repository.ProfileRepository
 import com.techvisiondz.app.core.data.repository.SavedArticleRepository
 import com.techvisiondz.app.core.data.repository.SupabaseArticleRepository
@@ -56,30 +56,13 @@ import com.techvisiondz.app.feature.settings.PermissionsDetailsScreen
 import com.techvisiondz.app.feature.settings.PrivacyPolicyScreen
 import com.techvisiondz.app.feature.settings.SettingsScreen
 import com.techvisiondz.app.feature.settings.SettingsViewModel
+import com.techvisiondz.app.feature.sources.SourcesScreen
 import com.techvisiondz.app.feature.tag.TagArticlesScreen
 import com.techvisiondz.app.feature.tag.TagArticlesViewModel
 import com.techvisiondz.app.feature.tag.TagListScreen
 import com.techvisiondz.app.feature.tag.TagViewModel
-import com.techvisiondz.app.feature.update.UpdateViewModel
-
 /**
  * Root navigation graph for the app.
- *
- * Uses type-safe routes ([Routes]) so every destination is compile-time checked.
- * The [ArticleRepository], [AuthRepository], [ProfileRepository] and
- * [SavedArticleRepository] defaults are the real Supabase-backed implementations
- * but can be injected by tests so the whole graph runs deterministically with
- * fakes.
- *
- * The graph is public-by-default: it always starts on the public [Routes.Home]
- * feed, and [AuthState.Loading] (session restoration) never blocks public
- * content. Guests can browse Home, Search, Article Detail, Categories, Authors
- * and Tags freely. Authentication is only required for protected routes
- * ([Routes.Account], [Routes.SavedArticles]) and for saving/bookmarking an
- * article. A guest who triggers one of those actions is sent to Sign In
- * without wiping the public back stack, and after a successful sign-in the
- * [LaunchedEffect] below returns them to the requesting context (the same
- * Article Detail, or Account for an account request) via pop-back.
  */
 @Composable
 fun AppNavHost(
@@ -87,7 +70,6 @@ fun AppNavHost(
     authRepository: AuthRepository = remember { SupabaseAuthRepository() },
     profileRepository: ProfileRepository = remember { SupabaseProfileRepository() },
     savedArticleRepository: SavedArticleRepository = remember { SupabaseSavedArticleRepository() },
-    updateViewModel: UpdateViewModel? = null,
     settingsViewModel: SettingsViewModel? = null,
     deepLinkTarget: DeepLinkTarget? = null,
 ) {
@@ -97,9 +79,6 @@ fun AppNavHost(
     val authState by authRepository.authState.collectAsState(initial = AuthState.Loading)
     val isAuthenticated = authState is AuthState.Authenticated
 
-    // Navigating to the article already shown (e.g. tapping the same related
-    // card) would push a duplicate detail screen on top of itself. Guarding
-    // here keeps the back stack stable and the same article from stacking.
     fun navigateToArticle(slug: String) {
         val current = navController.currentBackStackEntry
         val alreadyOpen = current?.destination?.hasRoute(Routes.ArticleDetail::class) == true &&
@@ -109,8 +88,6 @@ fun AppNavHost(
         }
     }
 
-    // Mirrors the article guard: tapping the tag already shown under the same
-    // slug never pushes a duplicate TagArticles screen on top of itself.
     fun navigateToTagArticles(slug: String) {
         val current = navController.currentBackStackEntry
         val alreadyOpen = current?.destination?.hasRoute(Routes.TagArticles::class) == true &&
@@ -120,11 +97,6 @@ fun AppNavHost(
         }
     }
 
-    // A VIEW intent (cold start or delivered while alive) is resolved by
-    // MainActivity into a [DeepLinkTarget] and navigated here, where this nav
-    // controller is the single source of truth. The guard above prevents a
-    // deep link from stacking the article that is already open, and an
-    // unsupported target (null from the resolver) never navigates at all.
     LaunchedEffect(deepLinkTarget) {
         val target = deepLinkTarget ?: return@LaunchedEffect
         when (target) {
@@ -132,18 +104,6 @@ fun AppNavHost(
         }
     }
 
-    // An updater ViewModel passed from the app root is shared app-wide (single
-    // instance for both the startup dialog host and the Account row). When
-    // none is supplied (tests / standalone embedding), a session-scoped one is
-    // created here so the Account screen still works.
-    val effectiveUpdateViewModel = updateViewModel
-        ?: viewModel(factory = UpdateViewModel.Factory)
-
-    // Like the update ViewModel, a Settings ViewModel passed from the app root
-    // is shared app-wide (single source of truth for the theme + locale the
-    // root derives from it). When none is supplied (tests / standalone
-    // embedding), a session-scoped one backed by the real preferences is
-    // created here so the Settings screen still works.
     val effectiveSettingsViewModel = settingsViewModel
         ?: viewModel(factory = SettingsViewModel.Factory)
 
@@ -175,14 +135,13 @@ fun AppNavHost(
                 onArticleClick = ::navigateToArticle,
                 onSearchClick = { navController.navigate(Routes.Search) },
                 onCategoriesClick = { navController.navigate(Routes.Categories) },
+                onSourcesClick = { navController.navigate(Routes.Sources) },
                 onAuthorsClick = { navController.navigate(Routes.Authors) },
                 onTagsClick = { navController.navigate(Routes.Tags) },
                 onAccountClick = {
                     if (isAuthenticated) {
                         navController.navigate(Routes.Account)
                     } else {
-                        // Tag this Sign In as an account request so a successful
-                        // sign-in returns to Account instead of public content.
                         navController.navigate(Routes.SignIn)
                         navController.currentBackStackEntry
                             ?.savedStateHandle
@@ -193,13 +152,17 @@ fun AppNavHost(
                 viewModel = viewModel(factory = HomeViewModel.factory(repository)),
             )
         }
+        composable<Routes.Sources> {
+            SourcesScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable<Routes.Account> {
             AccountScreen(
                 onBack = { navController.popBackStack() },
                 onSavedArticlesClick = { navController.navigate(Routes.SavedArticles) },
                 onSettingsClick = { navController.navigate(Routes.Settings) },
                 viewModel = viewModel(factory = AccountViewModel.factory(authRepository, profileRepository)),
-                updateViewModel = effectiveUpdateViewModel,
             )
         }
         composable<Routes.Settings> {
@@ -209,8 +172,8 @@ fun AppNavHost(
                 onPrivacyPolicyClick = { navController.navigate(Routes.PrivacyPolicy) },
                 onPermissionsClick = { navController.navigate(Routes.PermissionsDetails) },
                 onNotificationsClick = { navController.navigate(Routes.Notifications) },
+                onSourcesClick = { navController.navigate(Routes.Sources) },
                 viewModel = effectiveSettingsViewModel,
-                updateViewModel = effectiveUpdateViewModel,
             )
         }
         composable<Routes.About> {
@@ -231,6 +194,7 @@ fun AppNavHost(
         composable<Routes.Notifications> {
             NotificationsSettingsScreen(
                 onBack = { navController.popBackStack() },
+                viewModel = effectiveSettingsViewModel,
             )
         }
         composable<Routes.SavedArticles> {
@@ -330,13 +294,6 @@ fun AppNavHost(
         }
     }
 
-    // Reacts to session changes once the app is mounted. Public screens are
-    // never evicted for guests: only the protected Account / Saved Articles
-    // routes are removed when the session is lost. On a successful sign-in
-    // while on an auth screen, pop back to the requesting page (the same
-    // Article Detail or the page under Sign In); if a guest requested Account,
-    // land there afterwards. Falls back to Home only when there is no entry to
-    // pop back to.
     LaunchedEffect(authState) {
         val destination = navController.currentBackStackEntry?.destination
         if (isAuthenticated) {
@@ -369,8 +326,5 @@ fun AppNavHost(
     }
 }
 
-/** Internal nav-result key marking a guest's Sign In request for a protected destination. */
 private const val AUTH_RETURN_KEY = "techvisiondz.auth.returnTo"
-
-/** Value of [AUTH_RETURN_KEY] meaning the sign-in was requested from the Account action. */
 private const val AUTH_RETURN_ACCOUNT = "account"

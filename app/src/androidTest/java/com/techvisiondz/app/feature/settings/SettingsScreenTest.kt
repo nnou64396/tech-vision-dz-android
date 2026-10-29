@@ -1,9 +1,6 @@
 package com.techvisiondz.app.feature.settings
 
-import android.app.Application
-import android.content.Intent
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -11,27 +8,12 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.UriHandler
 import com.techvisiondz.app.BuildConfig
 import com.techvisiondz.app.R
 import com.techvisiondz.app.core.settings.AppLanguage
 import com.techvisiondz.app.core.settings.FakeSettingsPreferences
 import com.techvisiondz.app.core.settings.ThemeMode
-import com.techvisiondz.app.core.update.ApkVerificationResult
-import com.techvisiondz.app.core.update.InstallLaunchResult
-import com.techvisiondz.app.core.update.InstallPermissionState
-import com.techvisiondz.app.core.update.InstallerResolution
-import com.techvisiondz.app.core.update.UpdateApkDownloader
-import com.techvisiondz.app.core.update.UpdateApkInstaller
-import com.techvisiondz.app.core.update.UpdateApkVerifier
-import com.techvisiondz.app.core.update.UpdateInfo
-import com.techvisiondz.app.core.update.UpdateManifestFetcher
-import com.techvisiondz.app.core.update.UpdatePreferences
-import com.techvisiondz.app.core.update.UpdateRepository
-import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionDzTheme
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -57,6 +39,11 @@ class SettingsScreenTest {
         language: AppLanguage? = null,
         websiteUrl: String? = "https://techvisiondz.com",
         onOpenWebsite: (() -> Unit)? = null,
+        onAboutClick: () -> Unit = {},
+        onPrivacyPolicyClick: () -> Unit = {},
+        onPermissionsClick: () -> Unit = {},
+        onNotificationsClick: () -> Unit = {},
+        onSourcesClick: () -> Unit = {},
     ) {
         prefs = FakeSettingsPreferences(theme = theme, language = language)
         viewModel = SettingsViewModel(prefs) { AppLanguage.ENGLISH }
@@ -64,8 +51,12 @@ class SettingsScreenTest {
             TechVisionDzTheme {
                 SettingsScreen(
                     viewModel = viewModel,
-                    updateViewModel = idleUpdateViewModel(),
                     onBack = {},
+                    onAboutClick = onAboutClick,
+                    onPrivacyPolicyClick = onPrivacyPolicyClick,
+                    onPermissionsClick = onPermissionsClick,
+                    onNotificationsClick = onNotificationsClick,
+                    onSourcesClick = onSourcesClick,
                     websiteUrl = websiteUrl,
                     onOpenWebsite = onOpenWebsite,
                 )
@@ -74,48 +65,12 @@ class SettingsScreenTest {
         composeRule.waitForIdle()
     }
 
-    /** An UpdateViewModel that stays Idle: no check is ever triggered. */
-    private fun idleUpdateViewModel(): UpdateViewModel = UpdateViewModel(
-        repository = UpdateRepository(
-            manifestUrl = "https://example.invalid/update-manifest.json",
-            currentVersionCode = BuildConfig.VERSION_CODE,
-            enabled = false,
-            fetcher = object : UpdateManifestFetcher {
-                override suspend fun fetchManifest(rawUrl: String): String =
-                    error("manifest must never be fetched in the Settings UI test")
-            },
-        ),
-        downloader = object : UpdateApkDownloader {
-            override suspend fun download(url: String, dest: File, onProgress: (Float?) -> Unit) = Unit
-        },
-        verifier = object : UpdateApkVerifier {
-            override suspend fun verify(apk: File, expected: UpdateInfo): ApkVerificationResult =
-                ApkVerificationResult.Success
-        },
-        installer = object : UpdateApkInstaller {
-            override fun installPermissionState(): InstallPermissionState = InstallPermissionState.Allowed
-            override fun resolveInstaller(apk: File): InstallerResolution = InstallerResolution.Ready(Intent())
-            override fun launchInstaller(apk: File): InstallLaunchResult = InstallLaunchResult.Launched
-            override fun unknownAppSourcesSettingsIntent(): Intent = Intent()
-        },
-        preferences = object : UpdatePreferences {
-            override fun lastDeferredAtMillis(): Long? = null
-            override fun markDeferred(timestampMillis: Long) = Unit
-            override fun lastAutomaticCheckAtMillis(): Long? = null
-            override fun markAutomaticCheck(timestampMillis: Long) = Unit
-            override fun clear() = Unit
-        },
-        application = context.application as Application,
-    )
-
     @Test
     fun allSectionsRender() {
         setScreen()
 
         composeRule.onNodeWithText(context.getString(R.string.settings_appearance)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.settings_language)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.settings_updates)).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.settings_about)).assertIsDisplayed()
     }
 
     @Test
@@ -180,65 +135,7 @@ class SettingsScreenTest {
         assertEquals(AppLanguage.ARABIC, prefs.language())
     }
 
-    @Test
-    fun updateSectionShowsCheckPromptAndInstalledVersion() {
-        setScreen()
 
-        composeRule.onNodeWithText(context.getString(R.string.update_check)).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            context.getString(R.string.update_version, BuildConfig.VERSION_NAME),
-        ).assertIsDisplayed()
-    }
-
-    @Test
-    fun aboutSectionShowsBrandIdentityVersionAndWebsiteLink() {
-        setScreen()
-
-        composeRule.onNodeWithText(context.getString(R.string.app_name)).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            context.getString(R.string.update_version, BuildConfig.VERSION_NAME),
-        ).assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.settings_website)).assertIsDisplayed()
-    }
-
-    @Test
-    fun sponsoredLinkIsClearlyExternalAndOpensOnlyAfterTap() {
-        val openedUrls = mutableListOf<String>()
-        val uriHandler = object : UriHandler {
-            override fun openUri(uri: String) {
-                openedUrls += uri
-            }
-        }
-        prefs = FakeSettingsPreferences(language = AppLanguage.ENGLISH)
-        viewModel = SettingsViewModel(prefs) { AppLanguage.ENGLISH }
-        composeRule.setContent {
-            CompositionLocalProvider(LocalUriHandler provides uriHandler) {
-                TechVisionDzTheme {
-                    SettingsScreen(
-                        viewModel = viewModel,
-                        updateViewModel = idleUpdateViewModel(),
-                        onBack = {},
-                    )
-                }
-            }
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag("settings_about_sponsored_link").assertIsDisplayed()
-        composeRule.onNodeWithText(context.getString(R.string.settings_sponsored_link)).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            context.getString(R.string.settings_sponsored_link_description),
-        ).assertIsDisplayed()
-        assertEquals(emptyList<String>(), openedUrls)
-
-        composeRule.onNodeWithTag("settings_about_sponsored_link").performClick()
-        composeRule.waitForIdle()
-
-        assertEquals(
-            listOf("https://asiafilm.org/4/63a5c5ab5ac74ba25b412fc9d69758eb"),
-            openedUrls,
-        )
-    }
 
     @Test
     fun websiteLinkHiddenWhenUrlIsNotSafe() {

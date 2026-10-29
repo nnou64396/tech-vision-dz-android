@@ -10,26 +10,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.techvisiondz.app.core.navigation.DeepLinkResolver
 import com.techvisiondz.app.core.navigation.DeepLinkTarget
+import com.techvisiondz.app.core.notification.NotificationHelper
 
 class MainActivity : ComponentActivity() {
 
     /**
-     * The most recently delivered deep link, resolved to a navigation target.
-     * Held as Compose state so a new VIEW intent while the activity is alive
-     * re-composes the root and routes it; re-delivering the same link is a no-op
-     * (structural equality does not re-trigger), which prevents duplicate
-     * navigation for duplicate intents.
+     * The most recently delivered deep link or notification intent, resolved to a navigation target.
+     * Held as Compose state so a new intent while the activity is alive re-composes the root and routes it.
      */
     private var deepLinkTarget: DeepLinkTarget? by mutableStateOf(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Only honor the cold-start intent on the first creation. On a
-        // configuration change the ViewModel/navigation state is restored, so
-        // re-resolving the launching intent would push a duplicate screen.
         if (savedInstanceState == null) {
-            deepLinkTarget = DeepLinkResolver.resolve(intent?.data?.toString())
+            deepLinkTarget = resolveTarget(intent)
         }
         setContent {
             TechVisionDzApp(deepLinkTarget = deepLinkTarget)
@@ -39,6 +34,18 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        deepLinkTarget = DeepLinkResolver.resolve(intent.data?.toString())
+        deepLinkTarget = resolveTarget(intent)
+    }
+
+    private fun resolveTarget(intent: Intent?): DeepLinkTarget? {
+        if (intent == null) return null
+        val articleSlugExtra = intent.getStringExtra(NotificationHelper.EXTRA_ARTICLE_SLUG)
+        val dataUrl = intent.data?.toString()
+
+        return when {
+            !articleSlugExtra.isNullOrBlank() -> DeepLinkTarget.Article(articleSlugExtra)
+            !dataUrl.isNullOrBlank() -> DeepLinkResolver.resolve(dataUrl)
+            else -> null
+        }
     }
 }

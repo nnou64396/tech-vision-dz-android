@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -42,47 +41,29 @@ import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.settings.AppLanguage
 import com.techvisiondz.app.core.settings.ThemeMode
 import com.techvisiondz.app.core.ui.components.BackTopBarScreen
-import com.techvisiondz.app.core.ui.components.BrandMark
 import com.techvisiondz.app.core.ui.components.SectionHeader
 import com.techvisiondz.app.core.util.DownloadUrlPolicy
-import com.techvisiondz.app.feature.update.UpdateStatusCard
-import com.techvisiondz.app.feature.update.UpdateUiState
-import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
 import kotlinx.coroutines.launch
 
-private const val SPONSORED_LINK_URL =
-    "https://asiafilm.org/4/63a5c5ab5ac74ba25b412fc9d69758eb"
-
 /**
- * Settings screen - the app's app-experience control center.
- *
- * Contains primary sections:
- *  - About
- *  - Privacy Policy
- *  - Permissions Details
- *  - Notifications
- *  - Appearance: System / Light / Dark theme selection.
- *  - Language: Arabic / English.
- *  - Updates: reuses the shared [UpdateStatusCard].
+ * Settings screen - the app's control center.
  */
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    updateViewModel: UpdateViewModel,
     onBack: () -> Unit,
     onAboutClick: () -> Unit,
     onPrivacyPolicyClick: () -> Unit,
     onPermissionsClick: () -> Unit,
     onNotificationsClick: () -> Unit,
+    onSourcesClick: () -> Unit = {},
     websiteUrl: String? = AppConfig.ARTICLE_BASE_URL,
     onOpenWebsite: (() -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
-    val updateState by updateViewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val websiteFailureMessage = stringResource(R.string.settings_website_error)
-    val sponsoredLinkFailureMessage = stringResource(R.string.settings_sponsored_link_error)
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     val safeWebsiteUrl = remember(websiteUrl) { DownloadUrlPolicy.normalize(websiteUrl) }
@@ -93,20 +74,6 @@ fun SettingsScreen(
             runCatching { uriHandler.openUri(safeWebsiteUrl) }
                 .onFailure {
                     scope.launch { snackbarHostState.showSnackbar(websiteFailureMessage) }
-                }
-        }
-        Unit
-    }
-    val safeSponsoredLinkUrl = remember {
-        DownloadUrlPolicy.normalize(SPONSORED_LINK_URL)
-    }
-    val openSponsoredLink = {
-        if (safeSponsoredLinkUrl == null) {
-            scope.launch { snackbarHostState.showSnackbar(sponsoredLinkFailureMessage) }
-        } else {
-            runCatching { uriHandler.openUri(safeSponsoredLinkUrl) }
-                .onFailure {
-                    scope.launch { snackbarHostState.showSnackbar(sponsoredLinkFailureMessage) }
                 }
         }
         Unit
@@ -125,7 +92,7 @@ fun SettingsScreen(
                 .padding(horizontal = TechVisionSpacing.Lg)
                 .padding(top = TechVisionSpacing.Xl, bottom = TechVisionSpacing.Xl),
         ) {
-            // Core 4 Sections requested
+            // About Section
             SettingsSection(title = stringResource(R.string.settings_about_section)) {
                 SettingsNavigationItem(
                     title = stringResource(R.string.about_title),
@@ -137,6 +104,19 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
+            // Sources Section
+            SettingsSection(title = stringResource(R.string.sources_title)) {
+                SettingsNavigationItem(
+                    title = stringResource(R.string.sources),
+                    subtitle = stringResource(R.string.sources_subtitle),
+                    testTag = "settings_nav_sources",
+                    onClick = onSourcesClick,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
+            // Privacy Policy
             SettingsSection(title = stringResource(R.string.settings_privacy_policy)) {
                 SettingsNavigationItem(
                     title = stringResource(R.string.privacy_policy_title),
@@ -148,6 +128,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
+            // Permissions
             SettingsSection(title = stringResource(R.string.settings_permissions_details)) {
                 SettingsNavigationItem(
                     title = stringResource(R.string.permissions_title),
@@ -159,6 +140,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
+            // Notifications
             SettingsSection(title = stringResource(R.string.settings_notifications)) {
                 SettingsNavigationItem(
                     title = stringResource(R.string.notifications_title),
@@ -170,6 +152,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
+            // Appearance
             SettingsSection(title = stringResource(R.string.settings_appearance)) {
                 ThemeSelector(
                     current = state.themeMode,
@@ -179,6 +162,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
+            // Language
             SettingsSection(title = stringResource(R.string.settings_language)) {
                 LanguageSelector(
                     current = state.language,
@@ -188,21 +172,20 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
-            SettingsSection(title = stringResource(R.string.settings_updates)) {
-                UpdateStatusCard(
-                    state = updateState,
-                    onCheckForUpdate = { updateViewModel.checkForUpdate(manual = true) },
-                    onRetry = { updateViewModel.checkForUpdate(manual = true) },
-                    onUpdate = {
-                        when (updateState) {
-                            is UpdateUiState.UpdateAvailable -> updateViewModel.updateNow()
-                            UpdateUiState.ReadyToInstall,
-                            UpdateUiState.InstallationPermissionRequired ->
-                                updateViewModel.installUpdate()
-                            else -> Unit
-                        }
-                    },
-                    testTag = "settings_update_row",
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
+            // Developer Credit
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Text(
+                    text = stringResource(R.string.developer_attribution),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(TechVisionSpacing.Lg),
                 )
             }
         }

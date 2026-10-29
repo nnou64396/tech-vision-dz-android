@@ -116,6 +116,33 @@ fun AboutScreen(
 
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
+            // Developer attribution
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("about_developer_attribution"),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(modifier = Modifier.padding(TechVisionSpacing.Lg)) {
+                    Text(
+                        text = stringResource(R.string.developer_attribution),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.height(TechVisionSpacing.Xs))
+                    Text(
+                        text = "Designed & Engineered for Tech Vision DZ Algeria.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
+
             if (safeWebsiteUrl != null) {
                 Surface(
                     onClick = openWebsite,

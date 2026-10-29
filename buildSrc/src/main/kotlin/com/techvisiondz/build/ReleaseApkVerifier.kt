@@ -132,13 +132,13 @@ object ReleaseApkVerifier {
                         fix = "versionName in the APK must match the Gradle configuration; update it in defaultConfig and rebuild.",
                     )
                 }
-                if (info.permissions.none { it == expected.requiredPermission }) {
+                if (info.permissions.contains(expected.requiredPermission)) {
                     failures += CheckFailure(
-                        check = "Release APK declares REQUEST_INSTALL_PACKAGES",
-                        expected = expected.requiredPermission,
-                        actual = "permission missing (declared: ${info.permissions.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "none"})",
-                        fix = "Add <uses-permission android:name=\"${expected.requiredPermission}\"/> to AndroidManifest.xml and rebuild. " +
-                            "This APK must not be released because the in-app updater cannot install future updates without it.",
+                        check = "Release APK must not declare REQUEST_INSTALL_PACKAGES",
+                        expected = "permission absent",
+                        actual = "permission declared: ${expected.requiredPermission}",
+                        fix = "Remove <uses-permission android:name=\"${expected.requiredPermission}\"/> from AndroidManifest.xml and rebuild. " +
+                            "The in-app updater has been retired; updates must come via app stores and this permission is no longer required.",
                     )
                 }
             }
@@ -202,52 +202,22 @@ object ReleaseApkVerifier {
 
         val tree = parseXmlTree(output)
         val provider = treeProvider(tree, UPDATE_FILE_PROVIDER_CLASS)
-        if (provider == null) {
+        if (provider != null) {
             failures += CheckFailure(
-                check = "AndroidManifest declares the update FileProvider",
-                expected = "a <provider> with android:name=\"${UPDATE_FILE_PROVIDER_CLASS}\" in the merged manifest",
-                actual = "no such provider found",
-                fix = "Add the FileProvider block (androidx.core.content.FileProvider) to AndroidManifest.xml and rebuild. " +
-                    "The in-app updater cannot hand the verified APK to the system installer without it.",
+                check = "Update FileProvider must be removed",
+                expected = "no FileProvider for in-app updates",
+                actual = "found provider ${UPDATE_FILE_PROVIDER_CLASS}",
+                fix = "Remove the updater FileProvider declaration from AndroidManifest.xml; in-app APK installation has been retired.",
             )
-        } else {
-            val authority = attr(provider, "android:authorities")
-            if (authority != expected.fileProviderAuthority) {
-                failures += CheckFailure(
-                    check = "Update FileProvider authority",
-                    expected = expected.fileProviderAuthority,
-                    actual = authority ?: "missing android:authorities",
-                    fix = "Set android:authorities=\"\${applicationId}.fileprovider\" on the FileProvider and rebuild.",
-                )
-            }
-            val exported = attr(provider, "android:exported")
-            if (exported != "0x0") {
-                failures += CheckFailure(
-                    check = "Update FileProvider is not exported",
-                    expected = "android:exported=\"false\" (0x0)",
-                    actual = exported ?: "missing android:exported (defaults to true for API <17)",
-                    fix = "Set android:exported=\"false\" on the FileProvider; only the system package installer may reach it via scoped grants.",
-                )
-            }
-            val grant = attr(provider, "android:grantUriPermissions")
-            if (grant != "0xffffffff") {
-                failures += CheckFailure(
-                    check = "Update FileProvider grants URI permissions",
-                    expected = "android:grantUriPermissions=\"true\" (0xffffffff)",
-                    actual = grant ?: "missing android:grantUriPermissions (defaults to false)",
-                    fix = "Set android:grantUriPermissions=\"true\" on the FileProvider so the installer can read the staged APK for the single launch.",
-                )
-            }
         }
 
         val queriesHasInstallIntent = queriesDeclareInstallIntent(tree)
-        if (!queriesHasInstallIntent) {
+        if (queriesHasInstallIntent) {
             failures += CheckFailure(
-                check = "AndroidManifest <queries> resolves the system installer",
-                expected = "<queries> with VIEW intent and mimeType ${INSTALL_INTENT_MIME}",
-                actual = "no matching <queries> block found",
-                fix = "Add the <queries> VIEW/package-archive intent to AndroidManifest.xml and rebuild; without it the " +
-                    "system installer can be invisible on Android 11+ and every install is reported unavailable.",
+                check = "Installer <queries> must be removed",
+                expected = "no <queries> for package-archive installer resolution",
+                actual = "found matching <queries> block for package installation",
+                fix = "Remove the installer-specific <queries> block from AndroidManifest.xml; in-app APK installation has been retired.",
             )
         }
         return failures
@@ -274,20 +244,7 @@ object ReleaseApkVerifier {
         }
 
         val tree = parseXmlTree(output)
-        val cachePath = tree.flatMap { it.allDescendants() }
-            .firstOrNull { el ->
-                el.tag == "cache-path" &&
-                    attr(el, "android:name") == UPDATE_FILE_PROVIDER_PATH_NAME &&
-                    attr(el, "android:path") == UPDATE_FILE_PROVIDER_PATH
-            }
-        if (cachePath == null) {
-            failures += CheckFailure(
-                check = "FileProvider exposes the updater cache path",
-                expected = "<cache-path android:name=\"${UPDATE_FILE_PROVIDER_PATH_NAME}\" android:path=\"${UPDATE_FILE_PROVIDER_PATH}\">",
-                actual = "no matching <cache-path> entry",
-                fix = "Add the updater cache-path entry to res/xml/file_paths.xml (mirroring UpdateStash's cacheDir/updater) and rebuild.",
-            )
-        }
+        // Updater FileProvider removed; file_paths.xml may be empty.
         return failures
     }
 
@@ -318,6 +275,7 @@ object ReleaseApkVerifier {
         val versionCode = values["versionCode"] ?: return null
         val versionName = values["versionName"] ?: return null
         val permissions = output.lineSequence()
+            .map { it.trim() }
             .filter { it.startsWith("uses-permission: name=") }
             .mapNotNull { parseQuotedValues(it)["name"] }
             .toList()

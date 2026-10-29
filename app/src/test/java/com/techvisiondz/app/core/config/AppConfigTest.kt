@@ -14,4 +14,9 @@ class AppConfigTest {
     fun `default language code is Algerian Darija arq`() {
         assertEquals("arq", AppConfig.DEFAULT_LANGUAGE_CODE)
     }
+
+    @Test
+    fun `sources manifest is pinned to the production website over https`() {
+        assertEquals("https://techvisiondz.com/sources.json", AppConfig.SOURCES_MANIFEST_URL)
+    }
 }

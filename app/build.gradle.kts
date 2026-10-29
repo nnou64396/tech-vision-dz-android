@@ -48,8 +48,8 @@ android {
         targetSdk = 37
         // versionCode is the authoritative update ordering key. versionName is
         // display-only and normalized to match the v1.0.0 GitHub release.
-        versionCode = 15
-        versionName = "1.2.4"
+        versionCode = 16
+        versionName = "1.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -60,26 +60,33 @@ android {
         // Public article website base used to build canonical share URLs. Public,
         // not a secret — kept here to follow the same config architecture.
         buildConfigField("String", "ARTICLE_BASE_URL", "\"${secret("TECHVISION_ARTICLE_BASE_URL")}\"")
-        // Temporary pre-Google-Play in-app updater configuration. The manifest
-        // URL is a single pinned value (a stable GitHub Releases "latest" asset)
-        // so remote versions can never point the app at an arbitrary host.
-        // Flip UPDATER_ENABLED to false once the app is distributed via Google
-        // Play and the manual updater is retired.
+        // Public directory manifest generated from the website's own source
+        // data. Pinned to one HTTPS host so a manifest cannot redirect the app
+        // to an arbitrary origin.
+        buildConfigField(
+            "String",
+            "SOURCES_MANIFEST_URL",
+            "\"https://techvisiondz.com/sources.json\"",
+        )
         buildConfigField(
             "String",
             "UPDATE_MANIFEST_URL",
             "\"https://github.com/nnou64396/tech-vision-dz-android/releases/latest/download/update-manifest.json\"",
         )
-        buildConfigField("boolean", "UPDATER_ENABLED", "true")
+        buildConfigField("boolean", "UPDATER_ENABLED", "false")
     }
 
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                val storeFileObj = storeFilePath?.let { File(it) }
+                if (storeFileObj != null && storeFileObj.exists()) {
+                    keyAlias = keystoreProperties.getProperty("keyAlias")
+                    keyPassword = keystoreProperties.getProperty("keyPassword")
+                    storeFile = storeFileObj
+                    storePassword = keystoreProperties.getProperty("storePassword")
+                }
             }
         }
     }
@@ -90,7 +97,13 @@ android {
         }
         release {
             if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                val storeFileObj = storeFilePath?.let { File(it) }
+                if (storeFileObj != null && storeFileObj.exists()) {
+                    signingConfig = signingConfigs.getByName("release")
+                } else {
+                    logger.warn("keystore.properties storeFile not found: release builds will not use the upload signing config.")
+                }
             } else {
                 logger.warn("keystore.properties not found: release builds will not use the upload signing config.")
             }
@@ -142,6 +155,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
     // apksig (same codec as build-tools apksigner) verifies the staged update
     // APK's signing block directly, instead of relying on PackageManager
     // archive signer parsing that returns empty signers for a valid v2/v3-only

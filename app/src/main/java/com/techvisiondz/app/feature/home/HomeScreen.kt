@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,6 +69,7 @@ fun HomeScreen(
     onArticleClick: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onCategoriesClick: () -> Unit = {},
+    onSourcesClick: () -> Unit = {},
     onAuthorsClick: () -> Unit = {},
     onTagsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
@@ -97,6 +100,7 @@ fun HomeScreen(
             HomeHeader(
                 onSearchClick = onSearchClick,
                 onCategoriesClick = onCategoriesClick,
+                onSourcesClick = onSourcesClick,
                 onAuthorsClick = onAuthorsClick,
                 onTagsClick = onTagsClick,
                 onAccountClick = onAccountClick,
@@ -124,19 +128,34 @@ fun HomeScreen(
                             if (state.data.articles.isEmpty()) {
                                 EmptyState(message = stringResource(R.string.home_empty))
                             } else {
-                                ArticleList(
-                                    articles = state.data.articles,
-                                    onArticleClick = onArticleClick,
-                                    featuredFirst = true,
-                                    header = {
-                                        SectionHeader(title = stringResource(R.string.home_feed))
-                                    },
-                                    hasMore = state.data.hasMore,
-                                    isLoadingMore = state.data.isLoadingMore,
-                                    loadMoreError = state.data.loadMoreError,
-                                    onLoadMore = viewModel::loadMore,
-                                    onRetryLoadMore = viewModel::loadMore,
-                                )
+                                Column {
+                                    ArticleList(
+                                        articles = state.data.articles,
+                                        onArticleClick = onArticleClick,
+                                        featuredFirst = true,
+                                        header = {
+                                            SectionHeader(title = stringResource(R.string.home_feed))
+                                        },
+                                        hasMore = state.data.hasMore,
+                                        isLoadingMore = state.data.isLoadingMore,
+                                        loadMoreError = state.data.loadMoreError,
+                                        onLoadMore = viewModel::loadMore,
+                                        onRetryLoadMore = viewModel::loadMore,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.developer_attribution),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = TechVisionSpacing.Lg, vertical = TechVisionSpacing.Sm),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -150,6 +169,7 @@ fun HomeScreen(
 private fun HomeHeader(
     onSearchClick: () -> Unit,
     onCategoriesClick: () -> Unit,
+    onSourcesClick: () -> Unit,
     onAuthorsClick: () -> Unit,
     onTagsClick: () -> Unit,
     onAccountClick: () -> Unit,
@@ -168,8 +188,6 @@ private fun HomeHeader(
                 .padding(bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The website's brand header pairs the fennec mascot with the
-            // wordmark; the Home header mirrors that exact branding.
             FennecMascot()
             Spacer(modifier = Modifier.width(TechVisionSpacing.Sm))
             BrandMark(size = 36.dp)
@@ -212,6 +230,7 @@ private fun HomeHeader(
         SearchEntry(onClick = onSearchClick)
         DiscoveryBar(
             onCategoriesClick = onCategoriesClick,
+            onSourcesClick = onSourcesClick,
             onAuthorsClick = onAuthorsClick,
             onTagsClick = onTagsClick,
         )
@@ -252,6 +271,7 @@ private fun SearchEntry(onClick: () -> Unit) {
 @Composable
 private fun DiscoveryBar(
     onCategoriesClick: () -> Unit,
+    onSourcesClick: () -> Unit,
     onAuthorsClick: () -> Unit,
     onTagsClick: () -> Unit,
 ) {
@@ -265,6 +285,12 @@ private fun DiscoveryBar(
             icon = Icons.AutoMirrored.Filled.List,
             label = stringResource(R.string.categories),
             onClick = onCategoriesClick,
+            modifier = Modifier.weight(1f),
+        )
+        DiscoveryTile(
+            icon = Icons.Filled.Info,
+            label = stringResource(R.string.sources),
+            onClick = onSourcesClick,
             modifier = Modifier.weight(1f),
         )
         DiscoveryTile(

@@ -5,18 +5,8 @@
          and load content images over the network. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Required to hand the verified update APK to Android's package
-         installer (the in-app updater's install-from-unknown-sources flow). -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
-    <!-- Android 11+ (API 30+) package visibility: lets the app resolve the
-         system package installer for APK updates without broad visibility. -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:mimeType="application/vnd.android.package-archive" />
-        </intent>
-    </queries>
+    <!-- Required for push notifications on Android 13+ (API 33+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -58,19 +48,20 @@
             </intent-filter>
         </activity>
 
-        <!-- Temporary in-app APK updater: exposes ONLY the dedicated internal
-             updater directory (see res/xml/file_paths.xml) to the system
-             package installer via a scoped content URI. Not exported, and no
-             broad filesystem access is granted. -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+        <!-- Firebase Cloud Messaging service for Tech Vision DZ push notifications. -->
+        <service
+            android:name=".core.notification.TechVisionMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="techvision_news_channel" />
+
+
     </application>
 
 </manifest>

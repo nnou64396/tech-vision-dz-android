@@ -17,4 +17,20 @@ class FakeSettingsPreferences(
     override fun setLanguage(language: AppLanguage) {
         this.language = language
     }
+
+    override fun isNotificationsEnabled(): Boolean = true
+    override fun setNotificationsEnabled(enabled: Boolean) {}
+
+    override fun isNewsNotificationsEnabled(): Boolean = true
+    override fun setNewsNotificationsEnabled(enabled: Boolean) {}
+
+    override fun isAnnouncementsNotificationsEnabled(): Boolean = true
+    override fun setAnnouncementsNotificationsEnabled(enabled: Boolean) {}
+
+    override fun isAlertsNotificationsEnabled(): Boolean = true
+    override fun setAlertsNotificationsEnabled(enabled: Boolean) {}
+
+    override fun fcmToken(): String? = null
+    override fun setFcmToken(token: String?) {}
+
 }

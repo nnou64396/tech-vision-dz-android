@@ -82,15 +82,6 @@ fun PermissionsDetailsScreen(
                 type = "Normal (Granted by OS)",
             )
 
-            Spacer(modifier = Modifier.height(TechVisionSpacing.Lg))
-
-            PermissionCard(
-                name = stringResource(R.string.permission_install_packages_name),
-                identifier = "android.permission.REQUEST_INSTALL_PACKAGES",
-                purpose = stringResource(R.string.permission_install_packages_purpose),
-                type = "Special / Runtime action",
-            )
-
             Spacer(modifier = Modifier.height(TechVisionSpacing.Xl))
 
             Button(

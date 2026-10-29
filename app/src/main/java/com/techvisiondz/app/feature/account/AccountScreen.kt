@@ -44,9 +44,6 @@ import com.techvisiondz.app.core.ui.components.LoadingState
 import com.techvisiondz.app.core.ui.TechVisionIcons
 import com.techvisiondz.app.core.ui.formatPublishedAt
 import com.techvisiondz.app.feature.auth.AuthError
-import com.techvisiondz.app.feature.update.UpdateStatusCard
-import com.techvisiondz.app.feature.update.UpdateUiState
-import com.techvisiondz.app.feature.update.UpdateViewModel
 import com.techvisiondz.app.ui.theme.TechVisionSpacing
 
 /**
@@ -59,13 +56,11 @@ import com.techvisiondz.app.ui.theme.TechVisionSpacing
 @Composable
 fun AccountScreen(
     viewModel: AccountViewModel,
-    updateViewModel: UpdateViewModel,
     onBack: () -> Unit,
     onSavedArticlesClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val updateState by updateViewModel.uiState.collectAsState()
 
     BackTopBarScreen(title = stringResource(R.string.account_title), onBack = onBack) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -80,18 +75,6 @@ fun AccountScreen(
                     onSignOut = viewModel::signOut,
                     onSavedArticlesClick = onSavedArticlesClick,
                     onSettingsClick = onSettingsClick,
-                    updateState = updateState,
-                    onCheckForUpdates = { updateViewModel.checkForUpdate(manual = true) },
-                    onRetry = { updateViewModel.checkForUpdate(manual = true) },
-                    onUpdateAction = {
-                        when (updateState) {
-                            is UpdateUiState.UpdateAvailable -> updateViewModel.updateNow()
-                            UpdateUiState.ReadyToInstall,
-                            UpdateUiState.InstallationPermissionRequired ->
-                                updateViewModel.installUpdate()
-                            else -> Unit
-                        }
-                    },
                 )
 
                 else -> ErrorState(
@@ -111,10 +94,6 @@ private fun AccountContent(
     onSignOut: () -> Unit,
     onSavedArticlesClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    updateState: UpdateUiState,
-    onCheckForUpdates: () -> Unit,
-    onRetry: () -> Unit,
-    onUpdateAction: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -170,16 +149,6 @@ private fun AccountContent(
         Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
 
         SettingsRow(onClick = onSettingsClick)
-
-        Spacer(modifier = Modifier.height(TechVisionSpacing.Md))
-
-        UpdateStatusCard(
-            state = updateState,
-            onCheckForUpdate = onCheckForUpdates,
-            onRetry = onRetry,
-            onUpdate = onUpdateAction,
-            testTag = "account_update_row",
-        )
 
         Spacer(modifier = Modifier.weight(1f))
 
