@@ -122,6 +122,7 @@ data class CategoryDoc(
     val slug: String,
     val name: String,
     val description: String? = null,
+    val id: String? = null,
 )
 
 @Serializable
@@ -166,6 +167,13 @@ fun ArticleRpcDoc.toArticle(
 ): Article? {
     val t = translation ?: return null
     if (t.languageCode != languageCode) return null
+
+    // Excluded-category articles are hidden everywhere, including direct/deep
+    // links and language switches. Returning null reuses the existing
+    // "article not found" state instead of rendering the excluded article.
+    if (category != null && CategoryExclusions.isExcluded(category.id, category.slug, category.name)) {
+        return null
+    }
 
     return Article(
         id = id,

@@ -65,6 +65,7 @@ import com.techvisiondz.app.core.data.model.Article
 import com.techvisiondz.app.core.data.model.ArticleCard as ArticleCardModel
 import com.techvisiondz.app.core.data.model.ArticleLocales
 import com.techvisiondz.app.core.data.model.ArticleTranslationRef
+import com.techvisiondz.app.core.data.model.CategoryExclusions
 import com.techvisiondz.app.core.data.model.SoftwareSummary
 import com.techvisiondz.app.core.data.model.VideoRef
 import com.techvisiondz.app.core.ui.UiState
@@ -497,6 +498,13 @@ private fun ArticleDetailContent(
         LayoutDirection.Ltr
     }
 
+    // The software category is hidden from Android discovery. Its articles stay
+    // fully readable (including software downloads); only the category label is
+    // dropped here and in the metadata row below.
+    val visibleCategory = article.category?.takeUnless {
+        CategoryExclusions.isExcluded(it.slug, it.name)
+    }
+
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         Column(
             modifier = Modifier
@@ -535,7 +543,7 @@ private fun ArticleDetailContent(
                 Spacer(modifier = Modifier.size(TechVisionSpacing.Sm))
             }
 
-            article.category?.name?.takeIf { it.isNotBlank() }?.let { CategoryChip(label = it) }
+            visibleCategory?.name?.takeIf { it.isNotBlank() }?.let { CategoryChip(label = it) }
 
             Text(
                 text = article.title,
@@ -597,7 +605,7 @@ private fun ArticleDetailContent(
 
             val meta = buildList {
                 article.author?.name?.takeIf { it.isNotBlank() }?.let(::add)
-                article.category?.name?.takeIf { it.isNotBlank() }?.let(::add)
+                visibleCategory?.name?.takeIf { it.isNotBlank() }?.let(::add)
                 val date = formatPublishedAt(article.publishedAt)
                 if (date.isNotBlank()) add(date)
             }.joinToString(" · ")

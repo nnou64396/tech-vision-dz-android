@@ -5,6 +5,7 @@ import com.techvisiondz.app.core.data.model.toArticleCard
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,6 +47,17 @@ class SupabaseSavedArticleRepositoryTest {
         assertEquals("مؤلف", card.authorName)
         assertEquals("تقنية", card.categoryName)
         assertEquals("https://cdn.example/mock.png", card.coverUrl)
+    }
+
+    @Test
+    fun `previously stored bookmark for an excluded article is dropped`() {
+        val rows = json.decodeFromString<List<SavedArticleFeedRow>>(EXCLUDED_BOOKMARK_ROW)
+
+        assertEquals(1, rows.size)
+        // The bookmark row is still stored, but reading it back must not surface
+        // the excluded article again.
+        val card = rows.first().articles?.toArticleCard("ar") { _, _ -> "" }
+        assertNull(card)
     }
 
     @Test
@@ -127,6 +139,39 @@ class SupabaseSavedArticleRepositoryTest {
                                 }
                             }
                         ]
+                    }
+                }
+            ]
+        """
+
+        private const val EXCLUDED_BOOKMARK_ROW = """
+            [
+                {
+                    "user_id": "user-1",
+                    "created_at": "2026-09-10T12:00:00Z",
+                    "articles": {
+                        "id": "article-1",
+                        "status": "published",
+                        "article_translations": [
+                            {
+                                "language_code": "ar",
+                                "title": "عنوان المقال",
+                                "slug": "article-slug"
+                            }
+                        ],
+                        "categories": {
+                            "id": "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                            "slug": null,
+                            "is_active": true,
+                            "category_translations": [
+                                {
+                                    "language_code": "ar",
+                                    "name": "البرامج والتطبيقات",
+                                    "slug": "albramj-walttbyqat",
+                                    "description": null
+                                }
+                            ]
+                        }
                     }
                 }
             ]

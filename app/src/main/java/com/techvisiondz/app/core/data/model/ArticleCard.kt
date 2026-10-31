@@ -109,6 +109,15 @@ fun ArticleFeedRow.toArticleCard(
         ?: articleTranslations.firstOrNull()
         ?: return null
 
+    // Drop the whole article, not just its label: this shared mapper feeds the
+    // home feed, search, saved bookmarks and any other card list, so filtering
+    // here keeps every surface consistent and also re-filters previously stored
+    // bookmark rows when they are read back.
+    val category = categories
+    if (category != null && CategoryExclusions.isExcluded(category.id, category.categoryTranslations)) {
+        return null
+    }
+
     return ArticleCard(
         id = id,
         slug = translation.slug,
@@ -118,7 +127,7 @@ fun ArticleFeedRow.toArticleCard(
         publishedAt = publishedAt ?: "",
         readingTimeMinutes = readingTimeMinutes,
         viewsCount = viewsCount ?: 0L,
-        categoryName = categories?.pickName(languageCode),
+        categoryName = category?.pickName(languageCode),
         authorName = authors?.pickName(languageCode),
         coverUrl = articleMedia.firstOrNull { it.role == "cover" }?.media?.resolveUrl(resolvePublicUrl),
     )

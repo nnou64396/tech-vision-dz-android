@@ -34,7 +34,10 @@ data class ArticleCardRpcAuthor(
 
 @Serializable
 data class ArticleCardRpcCategory(
+    val id: String? = null,
+    val slug: String? = null,
     val name: String? = null,
+    val description: String? = null,
 )
 
 @Serializable
@@ -49,6 +52,17 @@ fun ArticleCardRpcDoc.toArticleCard(
 ): ArticleCard? {
     val cardSlug = slug?.takeIf { it.isNotBlank() } ?: return null
     val cardTitle = title?.takeIf { it.isNotBlank() } ?: return null
+
+    // Category/author/tag listing RPCs (and related-article lookups) return the
+    // full category metadata, so the production id can be checked directly.
+    // Localized slug/name checks stay as safeguards for older payloads.
+    val cardCategory = category
+    if (cardCategory != null &&
+        CategoryExclusions.isExcluded(cardCategory.id, cardCategory.slug, cardCategory.name)
+    ) {
+        return null
+    }
+
     val coverUrl = cover?.let { doc ->
         val bucket = doc.bucket
         val path = doc.storagePath
@@ -63,7 +77,7 @@ fun ArticleCardRpcDoc.toArticleCard(
         publishedAt = publishedAt ?: "",
         readingTimeMinutes = readingTimeMinutes,
         viewsCount = viewsCount ?: 0L,
-        categoryName = category?.name,
+        categoryName = cardCategory?.name,
         authorName = author?.name,
         coverUrl = coverUrl,
     )

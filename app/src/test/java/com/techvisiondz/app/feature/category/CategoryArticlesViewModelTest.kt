@@ -129,6 +129,45 @@ class CategoryArticlesViewModelTest {
     }
 
     @Test
+    fun `production software category slug is not browsed`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(
+            categoryArticles = mapOf("albramj-walttbyqat" to listOf(sampleArticleCard(id = "a1"))),
+        )
+        val viewModel = CategoryArticlesViewModel(repository = repository, slug = "albramj-walttbyqat")
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is UiState.Empty)
+        assertNull(repository.lastArticleSlug)
+    }
+
+    @Test
+    fun `production english software category slug is not browsed`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(
+            categoryArticles = mapOf("programs-and-applications" to listOf(sampleArticleCard(id = "a1"))),
+        )
+        val viewModel = CategoryArticlesViewModel(repository = repository, slug = "programs-and-applications")
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is UiState.Empty)
+        assertNull(repository.lastArticleSlug)
+    }
+
+    @Test
+    fun `production french software category slug is not browsed`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(
+            categoryArticles = mapOf("programmes-et-applications" to listOf(sampleArticleCard(id = "a1"))),
+        )
+        val viewModel = CategoryArticlesViewModel(repository = repository, slug = "programmes-et-applications")
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is UiState.Empty)
+        assertNull(repository.lastArticleSlug)
+    }
+
+    @Test
     fun `refresh on an excluded category stays empty without fetching`() = runTest(dispatcher) {
         val repository = FakeArticleRepository(
             categoryArticles = mapOf("apps" to listOf(sampleArticleCard(id = "a1"))),

@@ -89,19 +89,217 @@ class CatalogModelsTest {
     }
 
     @Test
-    fun `localized slug that differs is still excluded by its localized name`() {
+    fun `production software category is excluded in every supported language`() {
+        // Verbatim payload from the live `categories` endpoint, plus the Russian
+        // translation the category would receive if one were published.
         val row = CategoryRow(
-            id = "c_apps",
+            id = "033779c0-f152-4503-b9b3-0f3994bc52b7",
             translations = listOf(
+                CategoryTranslationRow(
+                    languageCode = "ar",
+                    name = "البرامج والتطبيقات",
+                    slug = "albramj-walttbyqat",
+                ),
                 CategoryTranslationRow(
                     languageCode = "arq",
                     name = "البرامج والتطبيقات",
-                    slug = "albaramij-waltatbiqat",
+                    slug = "albramj-walttbyqat",
+                ),
+                CategoryTranslationRow(
+                    languageCode = "en",
+                    name = "Programs and Applications",
+                    slug = "programs-and-applications",
+                ),
+                CategoryTranslationRow(
+                    languageCode = "fr",
+                    name = "Programmes et applications",
+                    slug = "programmes-et-applications",
+                ),
+                CategoryTranslationRow(
+                    languageCode = "ru",
+                    name = "Программное обеспечение и приложения",
+                    slug = "programmnoe-obespechenie-i-prilozheniya",
                 ),
             ),
         )
 
-        assertNull(row.toCategory("arq"))
+        listOf("ar", "arq", "en", "fr", "ru").forEach { language ->
+            assertNull("$language must stay hidden", row.toCategory(language))
+        }
+    }
+
+    @Test
+    fun `production category id alone is enough to exclude a category`() {
+        val row = CategoryRow(
+            id = "033779c0-f152-4503-b9b3-0f3994bc52b7",
+            translations = listOf(
+                CategoryTranslationRow(languageCode = "en", name = "Renamed later", slug = "renamed-later"),
+            ),
+        )
+
+        assertNull(row.toCategory("en"))
+        assertTrue(
+            CategoryExclusions.isExcluded(
+                "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                row.translations,
+            ),
+        )
+    }
+
+    @Test
+    fun `production localized slug and name are both excluded`() {
+        assertEquals("033779c0-f152-4503-b9b3-0f3994bc52b7", CategoryExclusions.EXCLUDED_CATEGORY_ID)
+        assertTrue(CategoryExclusions.isExcluded("albramj-walttbyqat", "البرامج والتطبيقات"))
+        assertTrue(CategoryExclusions.isExcluded("programs-and-applications", "Programs and Applications"))
+        assertTrue(CategoryExclusions.isExcluded("programmes-et-applications", "Programmes et applications"))
+        assertTrue(CategoryExclusions.isExcluded("albramj-walttbyqat"))
+        assertTrue(CategoryExclusions.isExcluded("programs-and-applications"))
+        assertTrue(CategoryExclusions.isExcluded("programmes-et-applications"))
+        assertTrue(CategoryExclusions.isExcluded("albramj-walttbyqat", null))
+        assertTrue(
+            CategoryExclusions.isExcluded(
+                CategoryExclusions.EXCLUDED_CATEGORY_ID,
+                "renamed-later",
+                "Renamed later",
+            ),
+        )
+        assertFalse(CategoryExclusions.isExcluded("other-id", "alssha", "الصحة"))
+        assertFalse(CategoryExclusions.isExcluded("technology", "Technology"))
+    }
+
+    @Test
+    fun `home feed drops the excluded article in every language`() {
+        listOf(
+            "ar" to "البرامج والتطبيقات",
+            "arq" to "البرامج والتطبيقات",
+            "en" to "Programs and Applications",
+            "fr" to "Programmes et applications",
+        ).forEach { (language, categoryName) ->
+            val row = ArticleFeedRow(
+                id = "article-1",
+                publishedAt = "2026-10-31T12:00:00Z",
+                articleTranslations = listOf(
+                    ArticleTranslationRow(
+                        languageCode = language,
+                        title = "حاب تحمّل الفيديوهات والموسيقى من الإنترنت بسهولة؟",
+                        slug = "download-videos-easily",
+                    ),
+                ),
+                categories = CategoryFeedRow(
+                    id = "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                    categoryTranslations = listOf(
+                        CategoryTranslationRow(
+                            languageCode = language,
+                            name = categoryName,
+                            slug = when (language) {
+                                "en" -> "programs-and-applications"
+                                "fr" -> "programmes-et-applications"
+                                else -> "albramj-walttbyqat"
+                            },
+                        ),
+                    ),
+                ),
+            )
+
+            assertNull("$language excluded article must not map", row.toArticleCard(language) { _, _ -> "" })
+        }
+    }
+
+    @Test
+    fun `home feed drops an excluded article by production id even with neutral metadata`() {
+        val row = ArticleFeedRow(
+            id = "article-1",
+            articleTranslations = listOf(
+                ArticleTranslationRow(languageCode = "arq", title = "خبر", slug = "news"),
+            ),
+            categories = CategoryFeedRow(
+                id = "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                categoryTranslations = listOf(
+                    CategoryTranslationRow(languageCode = "arq", name = "اسم آخر", slug = "ism-akhar"),
+                ),
+            ),
+        )
+
+        assertNull(row.toArticleCard("arq") { _, _ -> "" })
+    }
+
+    @Test
+    fun `home feed card keeps a non excluded category label`() {
+        val row = ArticleFeedRow(
+            id = "article-2",
+            articleTranslations = listOf(
+                ArticleTranslationRow(languageCode = "arq", title = "خبر تقني", slug = "tech-news"),
+            ),
+            categories = CategoryFeedRow(
+                id = "81cb777a-708c-411e-b8c4-5aafc88f3817",
+                categoryTranslations = listOf(
+                    CategoryTranslationRow(
+                        languageCode = "arq",
+                        name = "الذكاء الاصطناعي",
+                        slug = "aldhka-alastnaay",
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals("الذكاء الاصطناعي", row.toArticleCard("arq") { _, _ -> "" }?.categoryName)
+    }
+
+    @Test
+    fun `rpc card doc drops the excluded article in every language`() {
+        listOf(
+            "albramj-walttbyqat" to "البرامج والتطبيقات",
+            "programs-and-applications" to "Programs and Applications",
+            "programmes-et-applications" to "Programmes et applications",
+        ).forEach { (categorySlug, categoryName) ->
+            val doc = ArticleCardRpcDoc(
+                id = "article-1",
+                slug = "sample-a1",
+                title = "عنوان",
+                category = ArticleCardRpcCategory(
+                    id = "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                    slug = categorySlug,
+                    name = categoryName,
+                ),
+            )
+
+            assertNull("$categorySlug must stay hidden", doc.toArticleCard { _, _ -> "" })
+        }
+    }
+
+    @Test
+    fun `rpc card doc drops an excluded article by production id even with neutral metadata`() {
+        val doc = ArticleCardRpcDoc(
+            id = "article-1",
+            slug = "sample-a1",
+            title = "عنوان",
+            category = ArticleCardRpcCategory(
+                id = "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                slug = "renamed-later",
+                name = "Renamed later",
+            ),
+        )
+
+        assertNull(doc.toArticleCard { _, _ -> "" })
+    }
+
+    @Test
+    fun `rpc card doc keeps a non excluded article`() {
+        val doc = ArticleCardRpcDoc(
+            id = "article-2",
+            slug = "tech-news",
+            title = "خبر تقني",
+            category = ArticleCardRpcCategory(
+                id = "81cb777a-708c-411e-b8c4-5aafc88f3817",
+                slug = "aldhka-alastnaay",
+                name = "الذكاء الاصطناعي",
+            ),
+        )
+
+        val card = doc.toArticleCard { _, _ -> "" }
+
+        assertEquals("article-2", card?.id)
+        assertEquals("الذكاء الاصطناعي", card?.categoryName)
     }
 
     @Test

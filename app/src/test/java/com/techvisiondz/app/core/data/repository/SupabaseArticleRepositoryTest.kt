@@ -65,6 +65,54 @@ class SupabaseArticleRepositoryTest {
     }
 
     @Test
+    fun `excluded category article detail maps to null in every language`() {
+        listOf(
+            """{"id":"033779c0-f152-4503-b9b3-0f3994bc52b7","slug":"albramj-walttbyqat","name":"البرامج والتطبيقات"}""",
+            """{"id":"033779c0-f152-4503-b9b3-0f3994bc52b7","slug":"programs-and-applications","name":"Programs and Applications"}""",
+            """{"id":"033779c0-f152-4503-b9b3-0f3994bc52b7","slug":"programmes-et-applications","name":"Programmes et applications"}""",
+        ).forEach { categoryJson ->
+            val body = """
+                {
+                    "id": "article-1",
+                    "translation": {
+                        "language_code": "ar",
+                        "title": "عنوان المقال",
+                        "slug": "example-slug"
+                    },
+                    "category": $categoryJson
+                }
+            """
+
+            val doc = decode(body) { json.decodeFromString(ArticleRpcDoc.serializer(), body) }
+            assertNotNull(doc)
+            assertNull("$categoryJson must stay hidden", doc!!.toArticle("ar") { _, _ -> "" })
+        }
+    }
+
+    @Test
+    fun `excluded category article detail maps to null by production id even with neutral metadata`() {
+        val body = """
+            {
+                "id": "article-1",
+                "translation": {
+                    "language_code": "ar",
+                    "title": "عنوان المقال",
+                    "slug": "example-slug"
+                },
+                "category": {
+                    "id": "033779c0-f152-4503-b9b3-0f3994bc52b7",
+                    "slug": "renamed-later",
+                    "name": "Renamed later"
+                }
+            }
+        """
+
+        val doc = decode(body) { json.decodeFromString(ArticleRpcDoc.serializer(), body) }
+        assertNotNull(doc)
+        assertNull(doc!!.toArticle("ar") { _, _ -> "" })
+    }
+
+    @Test
     fun `storage download object maps to software file url`() {
         val body = withDownloadBody("uploads/toolbar-v2.4.apk", "uploads")
 

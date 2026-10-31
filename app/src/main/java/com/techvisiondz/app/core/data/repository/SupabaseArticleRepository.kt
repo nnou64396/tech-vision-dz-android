@@ -12,6 +12,7 @@ import com.techvisiondz.app.core.data.model.ArticleTranslationRef
 import com.techvisiondz.app.core.data.model.Author
 import com.techvisiondz.app.core.data.model.AuthorFeedRow
 import com.techvisiondz.app.core.data.model.Category
+import com.techvisiondz.app.core.data.model.CategoryExclusions
 import com.techvisiondz.app.core.data.model.CategoryRow
 import com.techvisiondz.app.core.data.model.Tag
 import com.techvisiondz.app.core.data.model.TagRow
@@ -57,6 +58,10 @@ class SupabaseArticleRepository(
             .select(Columns.raw(HOME_FEED_SELECT)) {
                 filter { eq("status", "published") }
                 filter { eq("article_translations.language_code", languageCode) }
+                // Excluded-category articles are filtered in the query (not only
+                // after mapping) so offset pagination keeps returning full pages
+                // and never drifts when excluded rows are skipped.
+                filter { neq("category_id", CategoryExclusions.EXCLUDED_CATEGORY_ID) }
                 // Order by publication time first, then break publication-time
                 // ties with the id so pagination is fully deterministic: the
                 // published_at DESC join is not unique, and without a secondary
@@ -132,8 +137,13 @@ class SupabaseArticleRepository(
             .sortedBy { it.name }
     }
 
-    override suspend fun getArticlesByCategory(slug: String, languageCode: String): List<ArticleCard> =
-        runTranslated { rpcArticleCards(GET_PUBLISHED_ARTICLE_CARDS_BY_CATEGORY, slug, languageCode) }
+    override suspend fun getArticlesByCategory(slug: String, languageCode: String): List<ArticleCard> {
+        // Defense in depth: the category UI already refuses this slug, and the
+        // card mapper drops excluded rows, but no caller should ever reach the
+        // RPC for an excluded category.
+        if (CategoryExclusions.isExcluded(slug)) return emptyList()
+        return runTranslated { rpcArticleCards(GET_PUBLISHED_ARTICLE_CARDS_BY_CATEGORY, slug, languageCode) }
+    }
 
     override suspend fun getArticlesByAuthor(slug: String, languageCode: String): List<ArticleCard> =
         runTranslated { rpcArticleCards(GET_PUBLISHED_ARTICLE_CARDS_BY_AUTHOR, slug, languageCode) }
@@ -155,6 +165,9 @@ class SupabaseArticleRepository(
                 .select(Columns.raw(SEARCH_SELECT)) {
                     filter { eq("status", "published") }
                     filter { eq("article_translations.language_code", languageCode) }
+                    // Same pagination reasoning as the home feed: filter at the
+                    // query level so excluded results do not consume page slots.
+                    filter { neq("category_id", CategoryExclusions.EXCLUDED_CATEGORY_ID) }
                     filter {
                         or(referencedTable = "article_translations") {
                             ilike("title", pattern)
