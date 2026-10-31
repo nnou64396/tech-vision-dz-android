@@ -11,26 +11,28 @@ enum class ThemeMode {
 }
 
 /**
- * UI language of the app. The app ships exactly two resource locales
- * (`values/` English and `values-ar/` Arabic), so the selection is bounded to
- * those two; [code] is the BCP-47 tag used to build the localized configuration
- * and [isRtl] drives the layout direction.
+ * UI language of the app. The app ships resource locales (`values/` English,
+ * `values-ar/` Arabic, `values-fr/` French, and `values-ru/` Russian);
+ * [code] is the BCP-47 tag used to build the localized configuration and [isRtl]
+ * drives the layout direction.
  */
 enum class AppLanguage(val code: String, val isRtl: Boolean) {
     ARABIC("ar", true),
     ENGLISH("en", false),
+    FRENCH("fr", false),
+    RUSSIAN("ru", false),
 }
 
 /**
- * The UI language used before the user makes a choice: Arabic on Arabic-locale
- * devices, English everywhere else — exactly the behavior of resolving the
- * default resources today, so first launch is unchanged for existing users.
+ * The UI language used before the user makes a choice: matches device language
+ * when supported (Arabic, French, Russian), or English everywhere else.
  */
 fun defaultSystemLanguage(): AppLanguage =
-    if (Locale.getDefault().language.equals("ar", ignoreCase = true)) {
-        AppLanguage.ARABIC
-    } else {
-        AppLanguage.ENGLISH
+    when (Locale.getDefault().language.lowercase()) {
+        "ar" -> AppLanguage.ARABIC
+        "fr" -> AppLanguage.FRENCH
+        "ru" -> AppLanguage.RUSSIAN
+        else -> AppLanguage.ENGLISH
     }
 
 /**

@@ -27,6 +27,7 @@
     <string name="article_language_arabic">🇸🇦 العربية</string>
     <string name="article_language_french">🇫🇷 Français</string>
     <string name="article_language_english">🇬🇧 English</string>
+    <string name="article_language_russian">🇷🇺 Русский</string>
     <string name="share_article">Share article</string>
     <plurals name="reading_time_minutes">
         <item quantity="one">%d minute read</item>
@@ -105,6 +106,8 @@
     <string name="settings_language">Language</string>
     <string name="language_arabic">العربية</string>
     <string name="language_english">English</string>
+    <string name="language_french">Français</string>
+    <string name="language_russian">Русский</string>
     <string name="settings_updates">Updates</string>
     <string name="settings_about">About</string>
     <string name="settings_website">Visit our website</string>

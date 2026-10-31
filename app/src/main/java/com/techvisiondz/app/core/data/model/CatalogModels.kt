@@ -56,8 +56,119 @@ data class TagTranslationRow(
     val label: String,
 )
 
+/**
+ * The website's "Software & Apps" category (Arabic: "البرامج والتطبيقات") is
+ * intentionally hidden from Android discovery and browsing.
+ *
+ * The canonical slug lives on `category_translations`, so the slug that reaches
+ * Android depends on the active language and may be a localized transliteration
+ * (the website fixtures use `apps`). Matching therefore inspects every
+ * translation's slug and name instead of assuming the English slug, and keeps a
+ * token-pair fallback ("software" + "apps") for localized names in the shipped
+ * languages. No category id is hard-coded.
+ */
+object CategoryExclusions {
+    /** Known normalized slugs for the excluded category. */
+    private val EXCLUDED_SLUGS = setOf(
+        "app",
+        "apps",
+        "application",
+        "applications",
+        "software",
+        "software-applications",
+        "software-apps",
+        "software-and-apps",
+        "logiciel",
+        "logiciels",
+        "logiciels-applications",
+        "programme",
+        "programmes",
+    )
+
+    /** Tokens naming the "software" half of the category, per shipped language. */
+    private val SOFTWARE_TOKENS = setOf(
+        "software",
+        "logiciel",
+        "logiciels",
+        "programme",
+        "programmes",
+        "برنامج",
+        "برامج",
+    )
+
+    /** Tokens naming the "apps" half of the category, per shipped language. */
+    private val APP_TOKENS = setOf(
+        "app",
+        "apps",
+        "application",
+        "applications",
+        "تطبيق",
+        "تطبيقات",
+    )
+
+    /** True when [slug] is the excluded category, matched across localizations. */
+    fun isExcluded(slug: String?): Boolean {
+        val tokens = slug.tokens()
+        if (tokens.isEmpty()) return false
+        if (tokens.joinToString("-") in EXCLUDED_SLUGS) return true
+        return tokens.hasSoftwareToken() && tokens.hasAppToken()
+    }
+
+    /** True when any translation identifies the excluded category. */
+    fun isExcluded(translations: List<CategoryTranslationRow>): Boolean =
+        translations.any { translation ->
+            isExcluded(translation.slug) || translation.name.hasSoftwareAndAppTokens()
+        }
+
+    private fun String.hasSoftwareAndAppTokens(): Boolean {
+        val tokens = tokens()
+        return tokens.hasSoftwareToken() && tokens.hasAppToken()
+    }
+
+    private fun List<String>.hasSoftwareToken(): Boolean = any { token ->
+        token in SOFTWARE_TOKENS ||
+            token.startsWith("logiciel") ||
+            token.startsWith("programme") ||
+            token.startsWith("программ")
+    }
+
+    private fun List<String>.hasAppToken(): Boolean = any { token ->
+        token in APP_TOKENS ||
+            token.startsWith("application") ||
+            token.startsWith("приложени")
+    }
+
+    private val SEPARATORS = Regex("[^\\p{L}\\p{N}]+")
+    private val ARABIC_DIACRITICS = Regex("[\\u064B-\\u065F\\u0670]")
+
+    private fun String?.tokens(): List<String> = this
+        ?.lowercase()
+        ?.replace(ARABIC_DIACRITICS, "")
+        ?.replace('أ', 'ا')
+        ?.replace('إ', 'ا')
+        ?.replace('آ', 'ا')
+        ?.replace('ى', 'ي')
+        ?.replace('ة', 'ه')
+        ?.split(SEPARATORS)
+        ?.mapNotNull { it.normalizedToken() }
+        ?.filter { it.isNotEmpty() }
+        .orEmpty()
+
+    /**
+     * Drops the Arabic conjunction "و" and definite article "ال" so
+     * "البرامج والتطبيقات" normalizes to the tokens "برامج" and "تطبيقات".
+     */
+    private fun String.normalizedToken(): String? {
+        var token = this
+        if (token.length > 2 && token.first() == 'و') token = token.substring(1)
+        if (token.length > 3 && token.startsWith("ال")) token = token.substring(2)
+        return token.takeIf { it.isNotBlank() }
+    }
+}
+
 /** Maps a raw category row to a locale-aware [Category]; mirrors the feed's translation fallback. */
 fun CategoryRow.toCategory(languageCode: String): Category? {
+    if (CategoryExclusions.isExcluded(translations)) return null
     val translation = translations.firstOrNull { it.languageCode == languageCode }
         ?: translations.firstOrNull()
         ?: return null

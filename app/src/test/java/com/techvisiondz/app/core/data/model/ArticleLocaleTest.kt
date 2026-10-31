@@ -31,9 +31,9 @@ class ArticleLocaleTest {
     // --- supported / rtl ---------------------------------------------------
 
     @Test
-    fun `the four website locales are supported and none others`() {
-        assertEquals(listOf("arq", "ar", "fr", "en"), ArticleLocales.SUPPORTED)
-        listOf("arq", "ar", "fr", "en").forEach {
+    fun `the five website locales are supported and none others`() {
+        assertEquals(listOf("arq", "ar", "fr", "en", "ru"), ArticleLocales.SUPPORTED)
+        listOf("arq", "ar", "fr", "en", "ru").forEach {
             assertTrue("$it should be supported", ArticleLocales.isSupported(it))
         }
         listOf("es", "de", "ar-SA", "ber", "zxx").forEach {
@@ -42,11 +42,12 @@ class ArticleLocaleTest {
     }
 
     @Test
-    fun `darija and fusha are distinct RTL locales`() {
+    fun `darija and fusha are distinct RTL locales while french english russian are LTR`() {
         assertTrue(ArticleLocales.isRtl(ArticleLocales.DARIJA))
         assertTrue(ArticleLocales.isRtl(ArticleLocales.ARABIC))
         assertFalse(ArticleLocales.isRtl(ArticleLocales.FRENCH))
         assertFalse(ArticleLocales.isRtl(ArticleLocales.ENGLISH))
+        assertFalse(ArticleLocales.isRtl(ArticleLocales.RUSSIAN))
         // The two Arabic locales must never collapse into one another.
         assertFalse(ArticleLocales.DARIJA == ArticleLocales.ARABIC)
     }
@@ -55,6 +56,7 @@ class ArticleLocaleTest {
     fun `isRtl and isSupported tolerate case, padding and null`() {
         assertTrue(ArticleLocales.isRtl(" AR "))
         assertTrue(ArticleLocales.isSupported("Fr"))
+        assertTrue(ArticleLocales.isSupported("RU"))
         assertFalse(ArticleLocales.isRtl(null))
         assertFalse(ArticleLocales.isSupported(null))
         assertFalse(ArticleLocales.isRtl("es"))
@@ -65,6 +67,7 @@ class ArticleLocaleTest {
     @Test
     fun `rows are returned in selector order regardless of wire order`() {
         val rows = listOf(
+            row("ru", "russian-slug"),
             row("en", "english-slug"),
             row("fr", "french-slug"),
             row("ar", "fusha-slug"),
@@ -72,14 +75,20 @@ class ArticleLocaleTest {
         )
 
         assertEquals(
-            listOf("arq", "ar", "fr", "en"),
+            listOf("arq", "ar", "fr", "en", "ru"),
             rows.toTranslationRefs().map { it.languageCode },
         )
     }
 
     @Test
     fun `each locale keeps its own slug`() {
-        val rows = listOf(row("arq", "slug-arq"), row("ar", "slug-ar"), row("fr", "slug-fr"), row("en", "slug-en"))
+        val rows = listOf(
+            row("arq", "slug-arq"),
+            row("ar", "slug-ar"),
+            row("fr", "slug-fr"),
+            row("en", "slug-en"),
+            row("ru", "slug-ru"),
+        )
 
         val refs = rows.toTranslationRefs()
 
@@ -87,6 +96,7 @@ class ArticleLocaleTest {
         assertEquals("slug-ar", refs.first { it.languageCode == "ar" }.slug)
         assertEquals("slug-fr", refs.first { it.languageCode == "fr" }.slug)
         assertEquals("slug-en", refs.first { it.languageCode == "en" }.slug)
+        assertEquals("slug-ru", refs.first { it.languageCode == "ru" }.slug)
     }
 
     @Test

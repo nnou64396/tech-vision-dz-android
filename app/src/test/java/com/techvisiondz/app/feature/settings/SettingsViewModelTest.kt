@@ -109,6 +109,26 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun frenchAndRussianSelectionsApplyImmediatelyAndSurviveRecreation() {
+        val preferences = FakeSettingsPreferences()
+        val first = SettingsViewModel(preferences) { AppLanguage.ENGLISH }
+
+        first.setLanguage(AppLanguage.FRENCH)
+        assertEquals(AppLanguage.FRENCH, first.uiState.value.language)
+        assertEquals(
+            AppLanguage.FRENCH,
+            SettingsViewModel(preferences) { AppLanguage.ENGLISH }.uiState.value.language,
+        )
+
+        first.setLanguage(AppLanguage.RUSSIAN)
+        assertEquals(AppLanguage.RUSSIAN, first.uiState.value.language)
+        assertEquals(
+            AppLanguage.RUSSIAN,
+            SettingsViewModel(preferences) { AppLanguage.ENGLISH }.uiState.value.language,
+        )
+    }
+
+    @Test
     fun togglingNotificationCategoriesAppliesImmediately() {
         val preferences = FakeSettingsPreferences()
         val viewModel = SettingsViewModel(preferences) { AppLanguage.ENGLISH }

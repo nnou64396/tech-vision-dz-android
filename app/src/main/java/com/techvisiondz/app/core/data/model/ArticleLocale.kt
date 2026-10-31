@@ -7,8 +7,8 @@ import kotlinx.serialization.Serializable
  * Content locales the TECH VISION DZ website may publish an article in.
  *
  * The backend stores one row per (article, locale) in `article_translations`
- * and each of those rows carries its **own slug**, so the arq/ar/fr/en
- * versions of one article are four distinct URLs pointing at one `articles.id`.
+ * and each of those rows carries its **own slug**, so the arq/ar/fr/en/ru
+ * versions of one article are five distinct URLs pointing at one `articles.id`.
  * Algerian Darija (`arq`) and Modern Standard Arabic (`ar`) are separate
  * locales with separate slugs and separate content: they are never merged and
  * never substituted for one another.
@@ -28,15 +28,16 @@ object ArticleLocales {
 
     const val ENGLISH: String = "en"
 
+    const val RUSSIAN: String = "ru"
+
     /**
      * Locales the app can render, in the order the selector lists them.
      *
      * A locale absent from this list is intentionally ignored rather than
-     * rendered: the app ships a label for these four only, and inventing a
+     * rendered: the app ships a label for these five only, and inventing a
      * label for an unrecognised backend locale would be worse than hiding it.
-     * Adding a fifth locale later is a one-line change here plus a label.
      */
-    val SUPPORTED: List<String> = listOf(DARIJA, ARABIC, FRENCH, ENGLISH)
+    val SUPPORTED: List<String> = listOf(DARIJA, ARABIC, FRENCH, ENGLISH, RUSSIAN)
 
     /** Locales written right-to-left. Both Arabic locales are RTL. */
     private val RTL: Set<String> = setOf(DARIJA, ARABIC)

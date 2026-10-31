@@ -100,9 +100,13 @@ class SupabaseArticleRepository(
         postgrest.from("categories")
             .select(Columns.raw(CATEGORY_LIST_SELECT)) {
                 filter { eq("is_active", true) }
-                filter { eq("category_translations.language_code", languageCode) }
             }
             .decodeList<CategoryRow>()
+            // The embedded language filter is applied here instead of in the
+            // query so every translation stays visible to the exclusion check
+            // (localized slugs/names), while categories still only appear for
+            // the requested language as before.
+            .filter { row -> row.translations.any { it.languageCode == languageCode } }
             .mapNotNull { it.toCategory(languageCode) }
             .sortedBy { it.name }
     }

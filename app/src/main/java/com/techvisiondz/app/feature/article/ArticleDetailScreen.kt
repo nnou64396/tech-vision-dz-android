@@ -774,6 +774,7 @@ private fun ArticleTranslationRef.labelRes(): Int = when (languageCode) {
     ArticleLocales.DARIJA -> R.string.article_language_darija
     ArticleLocales.ARABIC -> R.string.article_language_arabic
     ArticleLocales.FRENCH -> R.string.article_language_french
+    ArticleLocales.RUSSIAN -> R.string.article_language_russian
     else -> R.string.article_language_english
 }
 

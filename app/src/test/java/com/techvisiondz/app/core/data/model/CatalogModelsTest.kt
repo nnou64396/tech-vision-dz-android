@@ -1,7 +1,9 @@
 package com.techvisiondz.app.core.data.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -49,6 +51,127 @@ class CatalogModelsTest {
                 translations = listOf(CategoryTranslationRow(languageCode = "ar", name = "", slug = "x")),
             ).toCategory("ar"),
         )
+    }
+
+    @Test
+    fun `software and apps category is excluded while other categories remain available`() {
+        val softwareRow = CategoryRow(
+            id = "c_soft",
+            translations = listOf(
+                CategoryTranslationRow(languageCode = "en", name = "Software & Apps", slug = "software-applications"),
+            ),
+        )
+        val techRow = CategoryRow(
+            id = "c_tech",
+            translations = listOf(
+                CategoryTranslationRow(languageCode = "en", name = "Technology", slug = "tech"),
+            ),
+        )
+
+        assertNull(softwareRow.toCategory("en"))
+        assertEquals("tech", techRow.toCategory("en")?.slug)
+    }
+
+    @Test
+    fun `apps slug is excluded for the default darija locale`() {
+        val row = CategoryRow(
+            id = "c_apps",
+            translations = listOf(
+                CategoryTranslationRow(
+                    languageCode = "arq",
+                    name = "البرامج والتطبيقات",
+                    slug = "apps",
+                ),
+            ),
+        )
+
+        assertNull(row.toCategory("arq"))
+    }
+
+    @Test
+    fun `localized slug that differs is still excluded by its localized name`() {
+        val row = CategoryRow(
+            id = "c_apps",
+            translations = listOf(
+                CategoryTranslationRow(
+                    languageCode = "arq",
+                    name = "البرامج والتطبيقات",
+                    slug = "albaramij-waltatbiqat",
+                ),
+            ),
+        )
+
+        assertNull(row.toCategory("arq"))
+    }
+
+    @Test
+    fun `french and russian localized names are excluded`() {
+        val french = CategoryRow(
+            id = "c_fr",
+            translations = listOf(
+                CategoryTranslationRow(
+                    languageCode = "fr",
+                    name = "Logiciels et Applications",
+                    slug = "logiciels-et-applications",
+                ),
+            ),
+        )
+        val russian = CategoryRow(
+            id = "c_ru",
+            translations = listOf(
+                CategoryTranslationRow(
+                    languageCode = "ru",
+                    name = "Программное обеспечение и приложения",
+                    slug = "programmnoe-obespechenie-i-prilozheniya",
+                ),
+            ),
+        )
+
+        assertNull(french.toCategory("fr"))
+        assertNull(russian.toCategory("ru"))
+    }
+
+    @Test
+    fun `exclusion uses every translation not just the requested one`() {
+        val row = CategoryRow(
+            id = "c_apps",
+            translations = listOf(
+                CategoryTranslationRow(
+                    languageCode = "fr",
+                    name = "Applications mobiles",
+                    slug = "applications-mobiles",
+                ),
+                CategoryTranslationRow(languageCode = "arq", name = "البرامج والتطبيقات", slug = "apps"),
+            ),
+        )
+
+        assertNull(row.toCategory("fr"))
+    }
+
+    @Test
+    fun `unrelated categories remain available in every language`() {
+        val rows = listOf(
+            CategoryRow(id = "c1", translations = listOf(CategoryTranslationRow("arq", "الصحة", "alssha"))),
+            CategoryRow(id = "c2", translations = listOf(CategoryTranslationRow("fr", "Technologie", "technologie"))),
+            CategoryRow(id = "c3", translations = listOf(CategoryTranslationRow("ru", "Новости", "novosti"))),
+            CategoryRow(id = "c4", translations = listOf(CategoryTranslationRow("en", "Science", "science"))),
+        )
+
+        assertEquals("الصحة", rows[0].toCategory("arq")?.name)
+        assertEquals("Technologie", rows[1].toCategory("fr")?.name)
+        assertEquals("Новости", rows[2].toCategory("ru")?.name)
+        assertEquals("Science", rows[3].toCategory("en")?.name)
+    }
+
+    @Test
+    fun `excluded slug matching ignores case separators and padding`() {
+        assertTrue(CategoryExclusions.isExcluded(" APPS "))
+        assertTrue(CategoryExclusions.isExcluded("Software & Apps"))
+        assertTrue(CategoryExclusions.isExcluded("software_apps"))
+        assertTrue(CategoryExclusions.isExcluded("البرامج والتطبيقات"))
+        assertFalse(CategoryExclusions.isExcluded("technology"))
+        assertFalse(CategoryExclusions.isExcluded("الصحة"))
+        assertFalse(CategoryExclusions.isExcluded(null))
     }
 
     @Test

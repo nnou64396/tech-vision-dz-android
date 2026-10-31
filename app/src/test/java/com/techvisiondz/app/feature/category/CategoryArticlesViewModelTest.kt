@@ -14,6 +14,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -111,5 +113,34 @@ class CategoryArticlesViewModelTest {
 
         viewModel.consumeRefreshError()
         assertEquals(null, viewModel.refreshError.value)
+    }
+
+    @Test
+    fun `excluded category is not browsed`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(
+            categoryArticles = mapOf("apps" to listOf(sampleArticleCard(id = "a1"))),
+        )
+        val viewModel = CategoryArticlesViewModel(repository = repository, slug = "apps")
+
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is UiState.Empty)
+        assertNull(repository.lastArticleSlug)
+    }
+
+    @Test
+    fun `refresh on an excluded category stays empty without fetching`() = runTest(dispatcher) {
+        val repository = FakeArticleRepository(
+            categoryArticles = mapOf("apps" to listOf(sampleArticleCard(id = "a1"))),
+        )
+        val viewModel = CategoryArticlesViewModel(repository = repository, slug = "apps")
+
+        advanceUntilIdle()
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value is UiState.Empty)
+        assertFalse(viewModel.isRefreshing.value)
+        assertNull(repository.lastArticleSlug)
     }
 }

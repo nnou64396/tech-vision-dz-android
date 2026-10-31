@@ -302,6 +302,18 @@ private fun LanguageSelector(
                 testTag = "settings_language_english",
                 onClick = { onSelect(AppLanguage.ENGLISH) },
             ),
+            SelectionOption(
+                label = stringResource(R.string.language_french),
+                selected = current == AppLanguage.FRENCH,
+                testTag = "settings_language_french",
+                onClick = { onSelect(AppLanguage.FRENCH) },
+            ),
+            SelectionOption(
+                label = stringResource(R.string.language_russian),
+                selected = current == AppLanguage.RUSSIAN,
+                testTag = "settings_language_russian",
+                onClick = { onSelect(AppLanguage.RUSSIAN) },
+            ),
         ),
     )
 }

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.techvisiondz.app.core.config.AppConfig
 import com.techvisiondz.app.core.data.model.ArticleCard
+import com.techvisiondz.app.core.data.model.CategoryExclusions
 import com.techvisiondz.app.core.data.repository.ArticleRepository
 import com.techvisiondz.app.core.ui.UiState
 import kotlinx.coroutines.CancellationException
@@ -43,6 +44,10 @@ class CategoryArticlesViewModel(
     }
 
     fun loadArticles() {
+        if (CategoryExclusions.isExcluded(slug)) {
+            _uiState.value = UiState.Empty()
+            return
+        }
         _uiState.value = UiState.Loading
         viewModelScope.launch {
             _uiState.value = try {
@@ -62,6 +67,10 @@ class CategoryArticlesViewModel(
 
     /** Reloads the category's articles in place behind a refresh indicator. */
     fun refresh() {
+        if (CategoryExclusions.isExcluded(slug)) {
+            _uiState.value = UiState.Empty()
+            return
+        }
         if (_isRefreshing.value) return
         _isRefreshing.value = true
         viewModelScope.launch {
